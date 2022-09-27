@@ -8,13 +8,16 @@ from template.gen_asm_code.tvm_extern_asm_micro_kernel import intrin_gemm_MxKxN,
 dtype = "float32"
 
 @autotvm.template("matmul")
-def matmul(M, K, N, with_bias=False, with_relu=False):
+def matmul(M, K, N):
     cfg = autotvm.get_config()
 
     # Tiling structure: split M/N/K into 3 axes each.
     cfg.define_split("tile_x", M, num_outputs=3)
     cfg.define_split("tile_y", N, num_outputs=3)
     cfg.define_split("tile_k", K, num_outputs=3)
+
+    cfg.define_knob("unroll_k_knob", [8, 16, 32])
+    cfg.define_knob("nr_main_knob", [3, 4, 5])
 
     # Matrix "A" has a shape of (M, K).
     A = te.placeholder((M, K), name="A")
@@ -29,21 +32,12 @@ def matmul(M, K, N, with_bias=False, with_relu=False):
 
     k = te.reduce_axis((0, K), "k")
 
-    if with_bias:
-        # C = A x PackedB + Bias:
-        Bias = te.placeholder((N,), name="Bias")
-        C = te.compute(
-            (M, N),
-            lambda x, y: te.sum(A[x, k] * PackedB[k // kn, y // bn, k % kn, y % bn] + Bias[y], axis=k),
-            name="C",
-        )
-    else:
-        # C = A x PackedB:
-        C = te.compute(
-            (M, N),
-            lambda x, y: te.sum(A[x, k] * PackedB[k // kn, y // bn, k % kn, y % bn], axis=k),
-            name="C",
-        )
+    # C = A x PackedB:
+    C = te.compute(
+        (M, N),
+        lambda x, y: te.sum(A[x, k] * PackedB[k // kn, y // bn, k % kn, y % bn], axis=k),
+        name="C",
+    )
 
     # Schedule:
     s = te.create_schedule(C.op)
@@ -66,8 +60,6 @@ def matmul(M, K, N, with_bias=False, with_relu=False):
                                 cfg["tile_x"].size[-1],
                                 cfg["tile_k"].size[-1], 
                                 cfg["tile_y"].size[-1],
-                                with_bias,
-                                with_relu,
                                 K,
                                 cfg["tile_y"].size[-1],
                                 N,
@@ -77,16 +69,12 @@ def matmul(M, K, N, with_bias=False, with_relu=False):
                                 cfg["tile_x"].size[-1],
                                 cfg["tile_k"].size[-1], 
                                 cfg["tile_y"].size[-1],
-                                with_bias,
-                                with_relu,
                                 K,
                                 cfg["tile_y"].size[-1],
                                 N,
+                                cfg["unroll_k_knob"].val,
+                                cfg["nr_main_knob"].val,
                                 uniq_id
                                 ))
-    if with_bias:
-        return s, [A, PackedB, Bias, C]
-        # return s, [A, B, Bias, C]
-    else:
-        return s, [A, PackedB, C]
-        # return s, [A, B, C]
+    return s, [A, PackedB, C]
+    # return s, [A, B, C]

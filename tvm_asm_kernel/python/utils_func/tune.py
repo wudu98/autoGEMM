@@ -10,8 +10,6 @@ def tune(
     M,
     K,
     N,
-    with_bias,
-    with_relu,
     record_file,
     n_trial=2500,
     early_stopping=1000,
@@ -25,7 +23,7 @@ def tune(
         os.remove(record_file)
 
     task = autotvm.task.create(
-        "matmul", args=[M, K, N, with_bias, with_relu], target=target
+        "matmul", args=[M, K, N], target=target
     )
 
     # tuner = autotvm.tuner.XGBTuner(task)

@@ -63,7 +63,7 @@ class GemmTensorIntrin(object):
 
 
 
-def intrin_gemm_MxKxN(M, K, N, with_bias, with_relu, lda, ldb, ldc):
+def intrin_gemm_MxKxN(M, K, N, lda, ldb, ldc):
     """Defines a SIMD-accelerated transposed matmul."""
     # we generate a unique ID for every intrinsic definition, to prevent name
     # collisions in the generated source (e.g., if there are multiple operators
@@ -79,19 +79,11 @@ def intrin_gemm_MxKxN(M, K, N, with_bias, with_relu, lda, ldb, ldc):
     b = te.placeholder((K, N), name='b')
     k_axis = te.reduce_axis((0, K), name='k')
     
-    if with_bias:
-        bias = te.placeholder((N,), name="bias")
-        c = te.compute(
-            (M, N),
-            lambda i, j: te.sum(a[i, k_axis] * b[k_axis, j] + bias[j], axis=k_axis),
-            name="c",
-        )
-    else:
-        c = te.compute(
-            (M, N),
-            lambda i, j: te.sum(a[i, k_axis] * b[k_axis, j], axis=k_axis),
-            name="c",
-        )
+    c = te.compute(
+        (M, N),
+        lambda i, j: te.sum(a[i, k_axis] * b[k_axis, j], axis=k_axis),
+        name="c",
+    )
     a_buffer = tvm.tir.decl_buffer(a.shape, a.dtype, name='a_buffer', offset_factor=1, strides=[te.var('s1'), 1])
     b_buffer = tvm.tir.decl_buffer(b.shape, b.dtype, name='b_buffer', offset_factor=1, strides=[te.var('s2'), 1])
     c_buffer = tvm.tir.decl_buffer(c.shape, c.dtype, name='c_buffer', offset_factor=1, strides=[te.var('s3'), 1])
@@ -101,18 +93,6 @@ def intrin_gemm_MxKxN(M, K, N, with_bias, with_relu, lda, ldb, ldc):
         c: c_buffer,
     }
 
-    if with_bias:
-        bias_buffer = tvm.tir.decl_buffer(
-            bias.shape,
-            bias.dtype,
-            name="bias_buffer",
-            offset_factor=1,
-            strides=[
-                1,
-            ],
-        )
-        bind_map.update({bias: bias_buffer})
-
     def intrin_func(ins, outs):
         intrin = GemmTensorIntrin(M, K, N, lda, ldb, ldc, uniq_id, ins, outs)
         return intrin.body()
@@ -121,9 +101,9 @@ def intrin_gemm_MxKxN(M, K, N, with_bias, with_relu, lda, ldb, ldc):
     return intrin_decl, uniq_id
 
 
-def gemm_MxKxN_impl(M, K, N, with_bias, with_relu, lda, ldb, ldc, uniq_id):
+def gemm_MxKxN_impl(M, K, N, lda, ldb, ldc, unroll_k, nr_main, uniq_id):
     # Create c source code
-    cc_code = xsmm_asm_armv8_code(M, K, N, with_bias, with_relu, lda, ldb, ldc, uniq_id)
+    cc_code = xsmm_asm_armv8_code(M, K, N, lda, ldb, ldc, unroll_k, nr_main, uniq_id)
     
     temp = utils.tempdir()
     ll_path = temp.relpath("temp.ll")

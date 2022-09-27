@@ -40,4 +40,4 @@ if __name__ == "__main__":
     # target = "llvm"
     for i in range(len(M)):
         # print('%d, %d, %d' % (M[i], N[i], K[i]))
-        evaluate(M[i], K[i], N[i], 0, 0, best_schedule_file, target=target)
+        evaluate(M[i], K[i], N[i], best_schedule_file, target=target)

@@ -22,12 +22,6 @@ if __name__ == "__main__":
     parser.add_argument("-k", type=int, required=True, help="K")
     parser.add_argument("-n", type=int, required=True, help="N")
     parser.add_argument(
-        "--bias", default=False, action="store_true", help="Bias fusion."
-    )
-    parser.add_argument(
-        "--relu", default=False, action="store_true", help="Relu fusion."
-    )
-    parser.add_argument(
         "-s",
         "--step",
         type=int,
@@ -48,13 +42,11 @@ if __name__ == "__main__":
     M = args.m
     K = args.k
     N = args.n
-    with_bias = args.bias
-    with_relu = args.relu
 
     record_file = args.record_file
     step = args.step
 
     # target = "llvm -mtriple=aarch64-linux-gnu -mattr=+neon"
     target = "llvm -mtriple=arm64-apple-darwin -mattr=+neon"
-    tune(M, K, N, with_bias, with_relu, record_file, n_trial=step, target=target)
-    evaluate(M, K, N, with_bias, with_relu, record_file, target=target)
+    tune(M, K, N, record_file, n_trial=step, target=target)
+    evaluate(M, K, N, record_file, target=target)

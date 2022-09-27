@@ -16,6 +16,7 @@ def evaluate(M, K, N, record_file, target="llvm"):
         with tvm.target.Target(target):
             s, arg_buf = matmul(M, K, N)
             func = tvm.build(s, arg_buf, target=tvm.target.Target(target))
+            # print(tvm.lower(s, arg_buf))
 
             a = tvm.nd.array(np.random.uniform(-1, 1, size=(M, K)).astype(dtype), ctx)
             b = tvm.nd.array(np.random.rand(K, N).astype(dtype), ctx)
@@ -26,15 +27,22 @@ def evaluate(M, K, N, record_file, target="llvm"):
             tgt = tvm.target.Target.current()
             cfg = autotvm.task.DispatchContext.current.query(tgt, workload)
 
+            padding_size = cfg["padding_size"].val
             bn = cfg["tile_y"].size[-1]
             kn = cfg["tile_k"].size[-1]
+            bn_ceil = ((bn - 1) // padding_size + 1) * padding_size
+
+
             B = te.placeholder((K, N), name="B")
             PackedB = te.compute(
-                (K // kn, N // bn, kn, bn), lambda i, x, y, z: B[i * kn + y, x * bn + z], name="PackedB"
+                (K // kn, N // bn, kn, bn_ceil), 
+                lambda i, x, y, z: te.if_then_else(
+                    z < bn, B[i * kn + y, x * bn + z], 0
+                ), name="PackedB"
             )
-            packed_b = tvm.nd.array(np.zeros((K // kn, N // bn, kn, bn), dtype=dtype), ctx)
+            packed_b = tvm.nd.array(np.zeros((K // kn, N // bn, kn, bn_ceil), dtype=dtype), ctx)
             c = tvm.nd.array(np.zeros((M, N), dtype=dtype), ctx)
-            bias = tvm.nd.array(np.random.rand(N,).astype(dtype), ctx)
+
             packb_schedule = te.create_schedule(PackedB.op)
             packb_func = tvm.build(packb_schedule, [B, PackedB], name="OP_GEMM_%dX%dX%d_packB" % (M, N, K), target=target)
             packb_func(b, packed_b)

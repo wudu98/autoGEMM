@@ -1,7 +1,11 @@
 #!/bin/bash
+set -e
+
+tmp=`dirname $0`
+PROJECT_ROOT=`cd $tmp; pwd`
+cd ${PROJECT_ROOT}
 
 UNROLL=8
-NR=4
 TOT_REPEAT=65536000000
 
 for M in $(seq 1 1 120)
@@ -13,7 +17,10 @@ do
 	then
 		REPEAT=1000000000
 	fi
-	python make_c_file_asm.py $M $N $K $UNROLL $NR $REPEAT
-	make -s
-	./benchmark_kernel
+	for NR in $(seq 3 1 5)
+	do
+		python make_c_file_asm.py $M $N $K $UNROLL $NR $REPEAT
+		make -s
+		./benchmark_kernel
+	done
 done

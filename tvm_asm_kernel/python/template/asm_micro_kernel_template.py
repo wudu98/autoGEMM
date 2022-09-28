@@ -16,30 +16,24 @@ def matmul(M, K, N):
     cfg.define_split("tile_y", N, num_outputs=3)
     cfg.define_split("tile_k", K, num_outputs=3)
 
+    # Micro-kernel parameters used in tensorization.
     cfg.define_knob("unroll_k_knob", [8, 16, 32])
     cfg.define_knob("nr_main_knob", [3, 4, 5])
 
-    cfg.define_knob("padding_size", [4])
+    cfg.define_knob("padding_size", [1, 4])
     padding_size = cfg["padding_size"].val
 
     # Matrix "A" has a shape of (M, K).
     A = te.placeholder((M, K), name="A")
 
-    # Matrix "PackedB" has been pre-packed into shape of (N // bn, K, bn), for "bn" is the innermost axis of the splited "N" dim.
+    # Matrix "PackedB" has been pre-packed into shape of (K // kn, N // bn, K, bn_ceil), for "bn" is the innermost axis of the splited "N" dim.
+    # "bn_ceil" is a padding size to store "bn" elements.
     # Note the pre-pack format is only available for inference mode, where weight matrix "B" is fixed.
     bn = cfg["tile_y"].size[-1]
     kn = cfg['tile_k'].size[-1]
     bn_ceil = ((bn - 1) // padding_size + 1) * padding_size
 
     PackedB = te.placeholder((K // kn, N // bn, kn, bn_ceil), name='PackedB')
-    # B = te.placeholder((K, N), name="B")
-    # PackedB = te.compute((K // kn, N // bn, K, bn), lambda w, x, y, z: B[w * kn + y, x * bn + z], name='PackedB')
-    # PackedB = te.compute(
-    #     (K // kn, N // bn, kn, bn_ceil), 
-    #     lambda i, x, y, z: te.if_then_else(
-    #         z < bn, B[i * kn + y, x * bn + z], 0
-    #     ), name="PackedB"
-    # )
 
     k = te.reduce_axis((0, K), "k")
 
@@ -89,4 +83,3 @@ def matmul(M, K, N):
                                 ))
 
     return s, [A, PackedB, C]
-    # return s, [A, B, C]

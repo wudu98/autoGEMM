@@ -48,14 +48,12 @@ def evaluate(M, K, N, record_file, target="llvm"):
             packb_func(b, packed_b)
 
             func(a, packed_b, c)
-            # func(a, b, c)
 
     expected = np.dot(a.asnumpy(), b.asnumpy())
 
     tvm.testing.assert_allclose(c.asnumpy(), expected, rtol=1e-4, atol=1e-4)
     evaluator = func.time_evaluator(func.entry_name, ctx, number=1000, min_repeat_ms=1000)
     mean_time = evaluator(a, packed_b, c).mean
-    # mean_time = evaluator(a, b, c).mean
     gflops = 2 * M * N * K * 1e-9 / mean_time
-    # print("%f" % (gflops))
+
     print("GFLOPS: %f, avg time: %f ms" % (gflops, mean_time * 1000))

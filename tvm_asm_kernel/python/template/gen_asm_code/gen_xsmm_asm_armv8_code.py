@@ -626,11 +626,7 @@ def laf_asm_code(M, N, K, lda, ldb, ldc, UNROLL_K = 8, NR_MAIN = 4, with_bias = 
       [ldc]"r"(ldc)
     : "cc", "memory" """
     for line in range(RESERVED_REG_NUM - 6 + 2 * max(NR_MAIN_MR_MAIN, NR_REMAIN_MR_MAIN)):
-      # code_str += f", \"x{6 + line}\""
-      if 6 + line < 18 : # x18 register preserved in M2
-        code_str += f", \"x{6 + line}\""
-      else :
-        code_str += f", \"x{7 + line}\""
+      code_str += f", \"x{6 + line}\""
     code_str += f"\n                      "
     for i in range(32):
       code_str += f", \"v{i}\""

@@ -16,6 +16,7 @@ if [[ -d $tune_output_path ]]; then
 fi
 mkdir -p $tune_output_path
 mkdir -p $tune_output_path/perf
+mkdir -p $tune_output_path/log
 
 touch $tune_output_path/scheduler_summary.log
 
@@ -27,6 +28,7 @@ do
     N=`echo $line | awk '{print $2}'`
     K=`echo $line | awk '{print $3}'`
     python ${PROJECT_ROOT}/python/tune_scheduler.py -m ${M} -n ${N} -k ${K} -s ${tune_num} -r $tune_output_path/matmul.log > $tune_output_path/perf/${cnt}_matmul_${M}_${N}_${K}.perf
+    mv $tune_output_path/matmul.log.tmp $tune_output_path/log/${cnt}_matmul_${M}_${N}_${K}.log
     python ${PROJECT_ROOT}/python/summarize_scheduler.py --input $tune_output_path/matmul.log --output $tune_output_path/scheduler_summary.log
     let cnt+=1
 done

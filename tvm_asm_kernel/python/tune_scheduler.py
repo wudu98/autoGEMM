@@ -46,7 +46,6 @@ if __name__ == "__main__":
     record_file = args.record_file
     step = args.step
 
-    # target = "llvm -mtriple=aarch64-linux-gnu -mattr=+neon"
-    target = "llvm -mtriple=arm64-apple-darwin -mattr=+neon"
+    from config.mac_config import target
     tune(M, K, N, record_file, n_trial=step, target=target)
     evaluate(M, K, N, record_file, target=target)

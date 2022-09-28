@@ -35,9 +35,7 @@ if __name__ == "__main__":
 
     mod_list = []
     
-    # target = "llvm -mtriple=aarch64-linux-gnu -mattr=+neon"
-    target = "llvm -mtriple=arm64-apple-darwin -mattr=+neon"
-    # target = "llvm"
+    from config.mac_config import target
     for i in range(len(M)):
         # print('%d, %d, %d' % (M[i], N[i], K[i]))
         evaluate(M[i], K[i], N[i], best_schedule_file, target=target)

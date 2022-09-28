@@ -1,8 +1,9 @@
 import os
 from tvm import autotvm
 
+target = "llvm -mtriple=arm64-apple-darwin -mattr=+neon"
+
 cc_compiler = os.environ["TVM_CC"]
-# cc_compiler = "/usr/local/llvm-9/bin/clang++"
 
 measure_option = autotvm.measure_option(
         # builder=autotvm.LocalBuilder(n_parallel=1, timeout=100), runner=autotvm.LocalRunner(number=1, repeat=20, timeout=300, enable_cpu_cache_flush=True)

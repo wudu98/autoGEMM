@@ -5,7 +5,7 @@ from tvm.contrib import utils, clang
 import random
 import string
 from template.gen_asm_code.gen_xsmm_asm_armv8_code import xsmm_asm_armv8_code
-from config.linux_config import cc_compiler
+from config.common_config import cc_compiler
 
 
 class GemmTensorIntrin(object):

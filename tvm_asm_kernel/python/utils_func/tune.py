@@ -4,7 +4,7 @@ from tvm import testing
 from tvm import autotvm
 
 import os
-from config.mac_config import measure_option
+from config.common_config import measure_option
 
 def tune(
     M,

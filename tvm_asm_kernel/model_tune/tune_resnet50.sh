@@ -16,7 +16,7 @@ if [[ -f $MNK_file ]]; then
     rm -rf $MNK_file
 fi
 
-for (( i=0; i<21; i++))
+for (( i=20; i<21; i++))
 do
 	echo ${M[$i]} ${N[$i]} ${K[$i]} >> MNK.txt
 done
@@ -24,10 +24,10 @@ done
 bash ./scripts/tune.sh $tune_num
 
 if [[ -f "tune_output/tune.over" ]]; then
-	if [[ -f "resnet50_scheduler" ]]; then
-		rm -rf resnet50_scheduler
+	if [[ -f "scheduler_house/resnet50" ]]; then
+		rm -rf scheduler_house/resnet50
 	fi
-	mkdir resnet50_scheduler
-    cp tune_output/scheduler_summary.log resnet50_scheduler/scheduler_summary.log
+	mkdir -p scheduler_house/resnet50
+    cp tune_output/scheduler_summary.log scheduler_house/resnet50/scheduler_summary.log
 fi
 

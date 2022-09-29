@@ -11,10 +11,10 @@ dtype = "float32"
 def matmul(M, K, N):
     cfg = autotvm.get_config()
 
-    # Tiling structure: split M/N/K into 3 axes each.
+    # Tiling structure: split M/N into 3 axes, K into 2 axes.
     cfg.define_split("tile_x", M, num_outputs=3)
     cfg.define_split("tile_y", N, num_outputs=3)
-    cfg.define_split("tile_k", K, num_outputs=3)
+    cfg.define_split("tile_k", K, num_outputs=2)
 
     # Micro-kernel parameters used in tensorization.
     cfg.define_knob("unroll_k_knob", [8, 16, 32])
@@ -51,14 +51,16 @@ def matmul(M, K, N):
 
     xt, xo, xi = cfg["tile_x"].apply(s, C, x)
     yt, yo, yi = cfg["tile_y"].apply(s, C, y)
-    kt, ko, ki = cfg["tile_k"].apply(s, C, k)
+    ko, ki = cfg["tile_k"].apply(s, C, k)
 
-    # Make (xi, yi, ki) the inner most axes, to be tensorized later.
-    s[C].reorder(kt, xo, yt, xt, yo, ko, xi, yi, ki)
+    # Make (yi, xi, ki) the inner most axes, to be tensorized later.
+    s[C].reorder(yt, xt, yo, ko, xo, yi, xi, ki)
 
-    # Let autotvm to find the best order of the outmost 6 axes:
-    cfg.define_reorder("reorder", [kt, xo, yt, xt, yo, ko], "all")
-    new_order = cfg["reorder"].apply(s, C, [kt, xo, yt, xt, yo, ko])
+    # Let autotvm to find the best order of the 5 axes:
+    cfg.define_reorder("reorder_outer", [yt, xt], "all")
+    cfg["reorder_outer"].apply(s, C, [yt, xt])
+    cfg.define_reorder("reorder_inner", [yo, ko, xo], "all")
+    cfg["reorder_inner"].apply(s, C, [yo, ko, xo])
 
     # Inner kernel implementation for the tensorization.
     micro_kernel, uniq_id = intrin_gemm_MxKxN(
@@ -69,8 +71,8 @@ def matmul(M, K, N):
                                 bn_ceil,
                                 N,
                                 )
-    s[C].tensorize(xi, micro_kernel)
-    s[C].pragma(yo, "import_llvm", gemm_MxKxN_impl(
+    s[C].tensorize(yi, micro_kernel)
+    s[C].pragma(xt, "import_llvm", gemm_MxKxN_impl(
                                 cfg["tile_x"].size[-1],
                                 cfg["tile_k"].size[-1], 
                                 cfg["tile_y"].size[-1],

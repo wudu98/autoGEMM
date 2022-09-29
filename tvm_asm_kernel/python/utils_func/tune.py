@@ -25,6 +25,7 @@ def tune(
     task = autotvm.task.create(
         "matmul", args=[M, K, N], target=target
     )
+    print(task.config_space)
 
     # tuner = autotvm.tuner.XGBTuner(task)
     tuner = autotvm.tuner.XGBTuner(task, feature_type="knob")

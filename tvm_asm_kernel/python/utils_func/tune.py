@@ -26,6 +26,8 @@ def tune(
         "matmul", args=[M, K, N], target=target
     )
 
+    print(task.config_space)
+
     # tuner = autotvm.tuner.XGBTuner(task)
     tuner = autotvm.tuner.XGBTuner(task, feature_type="knob")
     # tuner = autotvm.tuner.GridSearchTuner(task)

@@ -734,12 +734,12 @@ int main() {{
   int n_loops = {repeat};
 
   for (int i = 0; i < n_warming; ++i) {{
-    laf::small_gemm(A, B, C, lda, ldb, ldc);
+    laf::small_gemm_with_bias(A, B, C, lda, ldb, ldc);
   }}
 
   Timer t;
   for (int i = 0; i < n_loops; ++i) {{
-    laf::small_gemm(A, B, C, lda, ldb, ldc);
+    laf::small_gemm_with_bias(A, B, C, lda, ldb, ldc);
   }}
 
   float latency = t.getTime();

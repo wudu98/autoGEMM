@@ -263,12 +263,12 @@ int main() {{
   const int nc = {NC};
 
   for (int i = 0; i < n_warming; ++i) {{
-    small_gemm(A, B, C);
+    small_gemm_with_bias(A, B, C);
   }}
 
   Timer t;
   for (int i = 0; i < n_loops; ++i) {{
-    small_gemm(A, B, C);
+    small_gemm_with_bias(A, B, C);
   }}
 
   float latency = t.getTime();

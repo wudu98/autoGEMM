@@ -8,11 +8,15 @@ cd ${PROJECT_ROOT}
 UNROLL=8
 TOT_REPEAT=65536000000
 
-for M in $(seq 5 5 80)
+M_list=(20 80)
+N_list=(16 32 64)
+K_list=(4 8 16 32 64 128)
+
+for K in ${K_list[*]}
 do
-	for N in $(seq 4 4 80)
+	for M in ${M_list[*]}
 	do
-		for K in $(seq 8 8 80)
+		for N in ${N_list[*]}
 		do
 			REPEAT=`expr $TOT_REPEAT / $M / $N / $K`
 			if test $REPEAT -gt 1000000000

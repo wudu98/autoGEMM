@@ -136,7 +136,7 @@ def micro_kernel_loop_asm(LOOP_ID, LAST_K_ID, LINES, COLS, real_lines, real_cols
         if ((LAST_K_ID == -1 or LOOP_ID < (LAST_K_ID - LAST_K_ID%4)) and line == 0 and col == 0):
           ori_line = line
           for line in range(real_lines):
-            if(mod_simd_lane_loop_id == line % 3 + 1 and (line >= real_lines - VEC_REG_A_LEN % real_lines or 2 * real_lines <= VEC_REG_A_LEN)):
+            if(mod_simd_lane_loop_id == line % 3 and (line >= real_lines - VEC_REG_A_LEN % real_lines or 2 * real_lines <= VEC_REG_A_LEN)):
               if A_odd_flag == 0:
                 line = (line + VEC_REG_A_LEN % real_lines) % real_lines
               code_str += f"    \"ldr     q{vector_scroll_A[A_odd_flag^1][line]}, [x{RESERVED_REG_NUM+LINES+line}], #16    \\n\"\n"
@@ -469,18 +469,19 @@ def m_dim_func_asm(MR_MAIN, MR_MAIN_LOOPS, MR_REMAIN, MR_REMAIN_LOOPS, NR, K, UN
 
 def n_dim_func_asm(REMAIN_N, K, UNROLL_K, NR, NR_LOOPS, MR_MAIN, MR_MAIN_LOOPS, MR_REMAIN, MR_REMAIN_LOOPS, with_bias) :
 
-    VEC_REG_B_LEN = NR if K < 8 else max(4, NR)
+    VEC_REG_B_LEN = NR if K <= 16 else max(4, NR)
     if NR == 6 :
-      VEC_REG_B_LEN = NR if K < 16 else 8
+      VEC_REG_B_LEN = NR if K <= 32 else 8
     
     vector_id_array_B = []
     for i in range(MR_MAIN*NR, MR_MAIN*NR+VEC_REG_B_LEN):
       vector_id_array_B.append(i)
 
+    VEC_REG_A_LEN = MR_MAIN if K <= 16 else min(32 - MR_MAIN*NR - VEC_REG_B_LEN, 2*MR_MAIN)
+
     vector_id_array_A = []
-    for i in range(MR_MAIN*NR+VEC_REG_B_LEN, min(32, MR_MAIN*NR+VEC_REG_B_LEN+2*MR_MAIN)):
+    for i in range(MR_MAIN*NR+VEC_REG_B_LEN, MR_MAIN*NR+VEC_REG_B_LEN+VEC_REG_A_LEN):
       vector_id_array_A.append(i)
-    VEC_REG_A_LEN = len(vector_id_array_A)
 
     register_scroll_B = [11, 12]
 
@@ -590,6 +591,10 @@ def MRSA(M, NR):
         MR_MAIN_LOOPS -= 2
         MR_REMAIN = 4
         MR_REMAIN_LOOPS = 3
+      elif MR_REMAIN == 3 and MR_MAIN_LOOPS >= 1 :
+        MR_MAIN_LOOPS -= 1
+        MR_REMAIN = 4
+        MR_REMAIN_LOOPS = 2
     elif MR_MAIN == 4 :
       if MR_REMAIN == 1 and MR_MAIN_LOOPS >= 2 :
         MR_MAIN_LOOPS -= 2

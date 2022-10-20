@@ -120,7 +120,7 @@ def micro_kernel_loop_asm(LOOP_ID, LAST_K_ID, LINES, COLS, real_lines, real_cols
         if ((LAST_K_ID == -1 or LOOP_ID < (LAST_K_ID - LAST_K_ID%4)) and line == 0 and col == 0):
           ori_line = line
           for line in range(real_lines):
-            if(mod_simd_lane_loop_id == line % 3 + 1 and (line >= real_lines - VEC_REG_A_LEN % real_lines or 2 * real_lines <= VEC_REG_A_LEN)):
+            if(mod_simd_lane_loop_id == line % 3 and (line >= real_lines - VEC_REG_A_LEN % real_lines or 2 * real_lines <= VEC_REG_A_LEN)):
               if A_odd_flag == 0:
                 line = (line + VEC_REG_A_LEN % real_lines) % real_lines
               code_str += f"    \"ldr     q{vector_scroll_A[A_odd_flag^1][line]}, [x{RESERVED_REG_NUM+LINES+line}], #16    \\n\"\n"
@@ -561,6 +561,10 @@ def MRSA(M, NR):
         MR_MAIN_LOOPS -= 2
         MR_REMAIN = 4
         MR_REMAIN_LOOPS = 3
+      elif MR_REMAIN == 3 and MR_MAIN_LOOPS >= 1 :
+        MR_MAIN_LOOPS -= 1
+        MR_REMAIN = 4
+        MR_REMAIN_LOOPS = 2
     elif MR_MAIN == 4 :
       if MR_REMAIN == 1 and MR_MAIN_LOOPS >= 2 :
         MR_MAIN_LOOPS -= 2
@@ -627,6 +631,10 @@ def laf_asm_code(M, N, K, lda, ldb, ldc, UNROLL_K = 8, NR_MAIN = 4, with_bias = 
     : "cc", "memory" """
     for line in range(RESERVED_REG_NUM - 6 + 2 * max(NR_MAIN_MR_MAIN, NR_REMAIN_MR_MAIN)):
       code_str += f", \"x{6 + line}\""
+      # if 6 + line < 18 : # x18 register preserved in M2
+      #   code_str += f", \"x{6 + line}\""
+      # else :
+      #   code_str += f", \"x{7 + line}\""
     code_str += f"\n                      "
     for i in range(32):
       code_str += f", \"v{i}\""

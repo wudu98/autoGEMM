@@ -8,8 +8,8 @@ cd ${PROJECT_ROOT}
 UNROLL=8
 TOT_REPEAT=65536000000
 
-M_list=(5 20 80)
-N_list=(16 32 64)
+M_list=( 5 80 80)
+N_list=(64 16 64)
 K_list=(4 16 64 256)
 
 for K in ${K_list[*]}

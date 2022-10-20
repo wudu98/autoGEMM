@@ -8,7 +8,7 @@ cd ${PROJECT_ROOT}
 UNROLL=8
 TOT_REPEAT=65536000000
 
-M_list=(15 16 17 18 19 20 40 40 40 40 40  6 26 46 66)
+M_list=(20 21 22 23 24 25 80 80 80 80 80  6 26 46 66)
 N_list=(64 64 64 64 64 64 16 20 24 28 32 20 36 52 68)
 
 LOOP_NUM=${#M_list[@]}
@@ -16,7 +16,7 @@ for (( i=0; i<$LOOP_NUM; i++))
 do
 	M=${M_list[$i]} 
 	N=${N_list[$i]} 
-	K=64
+	K=256
 
 	REPEAT=`expr $TOT_REPEAT / $M / $N / $K`
 	if test $REPEAT -gt 1000000000

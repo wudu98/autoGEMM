@@ -734,7 +734,7 @@ int main() {{
 
   float latency = t.getTime();
   float gflops = M * N * K * 2 / latency * n_loops / 1000000;
-  printf("%.2f\\n", gflops);
+  printf("%.2f, ", gflops);
 
   bool ACC = false;
   test_utils::gemm_ref(A, B, refC, M, N, K, lda, ldb, ldc, ACC);

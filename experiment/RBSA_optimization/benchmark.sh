@@ -8,8 +8,8 @@ cd ${PROJECT_ROOT}
 UNROLL=8
 TOT_REPEAT=65536000000
 
-M_list=(20 21 22 23 24 25 25 25 25 25 21 26 31 36)
-N_list=(32 32 32 32 32 32 36 40 44 48 20 36 52 68)
+M_list=(15 16 17 18 19 20 40 40 40 40 40  6 26 46 66)
+N_list=(64 64 64 64 64 64 16 20 24 28 32 20 36 52 68)
 
 LOOP_NUM=${#M_list[@]}
 for (( i=0; i<$LOOP_NUM; i++))
@@ -24,6 +24,8 @@ do
 		REPEAT=1000000000
 	fi
 	NR=4
+
+	echo -n $M, $N, $K," "
 	
 	python make_c_file_asm_v1.py $M $N $K $UNROLL $NR $REPEAT
 	make -s
@@ -36,5 +38,7 @@ do
 	python make_c_file_asm_v3.py $M $N $K $UNROLL $NR $REPEAT
 	make -s
 	./benchmark_kernel
+
+	echo ""
 
 done

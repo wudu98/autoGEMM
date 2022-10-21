@@ -10,13 +10,20 @@ import sys
 M = int(sys.argv[1])
 N = int(sys.argv[2])
 K = int(sys.argv[3])
-ori_M = M
-ori_N = N
-M = (M + 5 - 1) // 5 * 5
-N = (N + 16 - 1) // 16 * 16
 UNROLL_K = int(sys.argv[4])
 NR_MAIN = int(sys.argv[5])
 repeat = int(sys.argv[6])
+
+RB_strategy = int(sys.argv[7])
+# 0 - OpenBLAS strategy
+# 1 - LIBXSMM strategy
+# 2 - Our RBSA strategy
+
+real_cal_M = M
+real_cal_N = N
+if RB_strategy == 0:
+  M = (M + 5 - 1) // 5 * 5
+  N = (N + 16 - 1) // 16 * 16
 
 SIMD_LANE = 4
 assert (SIMD_LANE == 4)
@@ -96,16 +103,6 @@ def micro_kernel_loop_asm(LOOP_ID, LAST_K_ID, LINES, COLS, real_lines, real_cols
       if LOOP_K_END_FLAG and LOOP_ID == LAST_K_ID:
         continue
 
-      # Get next block A address
-      if (REG_BLOCK_TRANS_FLAG and LOOP_ID == LAST_K_ID and line == 0 and col == 0):
-        for j in range(next_lines):
-          if (j == 0):
-            code_str += f"    \"mov     x{RESERVED_REG_NUM+LINES}, x10    \\n\"\n"
-          elif(j == 1):
-            code_str += f"    \"add     x{RESERVED_REG_NUM+LINES+1}, x10, x6    \\n\"\n"
-          else:
-            code_str += f"    \"add     x{RESERVED_REG_NUM+LINES+j}, x{RESERVED_REG_NUM+LINES+j-2}, x6, lsl #1    \\n\"\n"
-      
       if not WITH_BIAS_FLAG:
         # Get next block C address
         if (REG_BLOCK_TRANS_FLAG and LOOP_ID == LAST_K_ID and line == LINES - 1 and col == COLS//UNROLL_N - 1):
@@ -131,6 +128,16 @@ def micro_kernel_loop_asm(LOOP_ID, LAST_K_ID, LINES, COLS, real_lines, real_cols
           for j in range(UNROLL_N):
             if(line < next_lines and SIMD_LANE*UNROLL_N*col + SIMD_LANE*j < next_cols):
               code_str += f"    \"ldr     q{line*COLS + col*UNROLL_N + j}, [x{RESERVED_REG_NUM+line}, #{(col*UNROLL_N + j)*16}]           \\n\"\n"
+
+      # Get next block A address
+      if (REG_BLOCK_TRANS_FLAG and LOOP_ID == LAST_K_ID and line == 0 and col == 0):
+        for j in range(next_lines):
+          if (j == 0):
+            code_str += f"    \"mov     x{RESERVED_REG_NUM+LINES}, x10    \\n\"\n"
+          elif(j == 1):
+            code_str += f"    \"add     x{RESERVED_REG_NUM+LINES+1}, x10, x6    \\n\"\n"
+          else:
+            code_str += f"    \"add     x{RESERVED_REG_NUM+LINES+j}, x{RESERVED_REG_NUM+LINES+j-2}, x6, lsl #1    \\n\"\n"
 
       # Load next A in vector register
       if not REG_BLOCK_TRANS_FLAG :
@@ -163,7 +170,7 @@ def micro_kernel_loop_asm(LOOP_ID, LAST_K_ID, LINES, COLS, real_lines, real_cols
           # Load next block A
           if(LOOP_ID == LAST_K_ID and line < next_lines and col == (real_cols+SIMD_LANE-1)//SIMD_LANE//UNROLL_N - 1) :
             if A_odd_flag == 0 or line >= real_lines - VEC_REG_A_LEN % real_lines:
-              code_str += f"    \"ldr     q{vector_scroll_A[0][line]}, [x{RESERVED_REG_NUM+LINES+line}]    \\n\"\n"
+              code_str += f"    \"ldr     q{vector_scroll_A[0][line]}, [x{RESERVED_REG_NUM+LINES+line}], #16    \\n\"\n"
 
       # Sequence Load next B in vector register
       if (line == LINES - 1):
@@ -183,9 +190,7 @@ def micro_kernel_loop_asm(LOOP_ID, LAST_K_ID, LINES, COLS, real_lines, real_cols
     # Extra operations ensure that load next block A works correctly
     if REG_BLOCK_TRANS_FLAG and LOOP_ID == LAST_K_ID and WITH_BIAS_FLAG:
       for line in range(next_lines):
-        if A_odd_flag == 0 or line >= real_lines - VEC_REG_A_LEN % real_lines:
-          code_str += f"    \"add     x{RESERVED_REG_NUM+LINES+line}, x{RESERVED_REG_NUM+LINES+line}, #16             \\n\"\n"
-        else :
+        if not (A_odd_flag == 0 or line >= real_lines - VEC_REG_A_LEN % real_lines):
           code_str += f"    \"ldr     q{vector_scroll_A[0][line]}, [x{RESERVED_REG_NUM+LINES+line}], #16    \\n\"\n"
     
     # Extra operations ensure that Load next block B works correctly
@@ -520,85 +525,92 @@ def NRSA(N, NR_MAIN):
     NR_REMAIN = CEIL_NC % NR_MAIN
     NR_MAIN_LOOPS = CEIL_NC // NR_MAIN
     NR_REMAIN_LOOPS = 1 if NR_REMAIN else 0
-    if NR_MAIN == 3 :
-      if NR_REMAIN == 1 and NR_MAIN_LOOPS >= 1 :
-        NR_MAIN_LOOPS -= 1
-        NR_REMAIN = 4
-      elif NR_REMAIN == 2 and NR_MAIN_LOOPS >= 1 :
-        NR_MAIN_LOOPS -= 1
-        NR_REMAIN = 5
-    elif NR_MAIN == 4 :
-      if NR_REMAIN == 1 and NR_MAIN_LOOPS >= 1 :
-        NR_MAIN_LOOPS -= 1
-        NR_REMAIN = 5
-      elif NR_REMAIN == 2 :
-        if NR_MAIN_LOOPS >= 2 :
-          NR_MAIN_LOOPS -= 2
-          NR_REMAIN = 5
-          NR_REMAIN_LOOPS = 2
-        elif NR_MAIN_LOOPS >= 1 :
+
+    if RB_strategy == 2:
+      if NR_MAIN == 3 :
+        if NR_REMAIN == 1 and NR_MAIN_LOOPS >= 1 :
           NR_MAIN_LOOPS -= 1
-          NR_REMAIN = 6
-      elif NR_REMAIN == 3 and NR_MAIN_LOOPS >= 3 :
-        NR_MAIN_LOOPS -= 3
-        NR_REMAIN = 5
-        NR_REMAIN_LOOPS = 3
-    elif NR_MAIN == 5 :
-      if NR_REMAIN == 1 :
-        if NR_MAIN_LOOPS >= 3 :
-          NR_MAIN_LOOPS -= 3
           NR_REMAIN = 4
-          NR_REMAIN_LOOPS = 4
-        elif NR_MAIN_LOOPS >= 1 :
+        elif NR_REMAIN == 2 and NR_MAIN_LOOPS >= 1 :
           NR_MAIN_LOOPS -= 1
-          NR_REMAIN = 6
-      elif NR_REMAIN == 2 and NR_MAIN_LOOPS >= 2 :
-        NR_MAIN_LOOPS -= 2
-        NR_REMAIN = 4
-        NR_REMAIN_LOOPS = 3
-      elif NR_REMAIN == 3 and NR_MAIN_LOOPS >= 1 :
-        NR_MAIN_LOOPS -= 1
-        NR_REMAIN = 4
-        NR_REMAIN_LOOPS = 2
+          NR_REMAIN = 5
+      elif NR_MAIN == 4 :
+        if NR_REMAIN == 1 and NR_MAIN_LOOPS >= 1 :
+          NR_MAIN_LOOPS -= 1
+          NR_REMAIN = 5
+        elif NR_REMAIN == 2 :
+          if NR_MAIN_LOOPS >= 2 :
+            NR_MAIN_LOOPS -= 2
+            NR_REMAIN = 5
+            NR_REMAIN_LOOPS = 2
+          elif NR_MAIN_LOOPS >= 1 :
+            NR_MAIN_LOOPS -= 1
+            NR_REMAIN = 6
+        elif NR_REMAIN == 3 and NR_MAIN_LOOPS >= 3 :
+          NR_MAIN_LOOPS -= 3
+          NR_REMAIN = 5
+          NR_REMAIN_LOOPS = 3
+      elif NR_MAIN == 5 :
+        if NR_REMAIN == 1 :
+          if NR_MAIN_LOOPS >= 3 :
+            NR_MAIN_LOOPS -= 3
+            NR_REMAIN = 4
+            NR_REMAIN_LOOPS = 4
+          elif NR_MAIN_LOOPS >= 1 :
+            NR_MAIN_LOOPS -= 1
+            NR_REMAIN = 6
+        elif NR_REMAIN == 2 and NR_MAIN_LOOPS >= 2 :
+          NR_MAIN_LOOPS -= 2
+          NR_REMAIN = 4
+          NR_REMAIN_LOOPS = 3
+        elif NR_REMAIN == 3 and NR_MAIN_LOOPS >= 1 :
+          NR_MAIN_LOOPS -= 1
+          NR_REMAIN = 4
+          NR_REMAIN_LOOPS = 2
 
     return NR_MAIN_LOOPS, NR_REMAIN, NR_REMAIN_LOOPS
 
 def MRSA(M, NR):
-    MR_MAIN = min(6, (32 - max(4, NR)) // (NR + 1))
+    if RB_strategy == 2:
+      MR_MAIN = min(6, (32 - max(4, NR)) // (NR + 1))
+    else:
+      MR_MAIN = 5
+
     MR_REMAIN = M % MR_MAIN
     MR_MAIN_LOOPS = M // MR_MAIN
     MR_REMAIN_LOOPS = 1 if MR_REMAIN else 0
-    if MR_MAIN == 5 :
-      if MR_REMAIN == 1 :
-        if MR_MAIN_LOOPS >= 3 :
-          MR_MAIN_LOOPS -= 3
+    if RB_strategy == 2:
+      if MR_MAIN == 5 :
+        if MR_REMAIN == 1 :
+          if MR_MAIN_LOOPS >= 3 :
+            MR_MAIN_LOOPS -= 3
+            MR_REMAIN = 4
+            MR_REMAIN_LOOPS = 4
+          elif MR_MAIN_LOOPS >= 1 :
+            MR_MAIN_LOOPS -= 1
+            MR_REMAIN = 3
+            MR_REMAIN_LOOPS = 2
+        elif MR_REMAIN == 2 and MR_MAIN_LOOPS >= 2 :
+          MR_MAIN_LOOPS -= 2
           MR_REMAIN = 4
-          MR_REMAIN_LOOPS = 4
-        elif MR_MAIN_LOOPS >= 1 :
+          MR_REMAIN_LOOPS = 3
+        elif MR_REMAIN == 3 and MR_MAIN_LOOPS >= 1 :
           MR_MAIN_LOOPS -= 1
-          MR_REMAIN = 3
+          MR_REMAIN = 4
           MR_REMAIN_LOOPS = 2
-      elif MR_REMAIN == 2 and MR_MAIN_LOOPS >= 2 :
-        MR_MAIN_LOOPS -= 2
-        MR_REMAIN = 4
-        MR_REMAIN_LOOPS = 3
-      elif MR_REMAIN == 3 and MR_MAIN_LOOPS >= 1 :
+      elif MR_MAIN == 4 :
+        if MR_REMAIN == 1 and MR_MAIN_LOOPS >= 2 :
+          MR_MAIN_LOOPS -= 2
+          MR_REMAIN = 3
+          MR_REMAIN_LOOPS = 3
+        elif MR_REMAIN == 2 and MR_MAIN_LOOPS >= 1 :
+            MR_MAIN_LOOPS -= 1
+            MR_REMAIN = 3
+            MR_REMAIN_LOOPS = 2
+      elif MR_MAIN == 3 and MR_REMAIN == 1 and MR_MAIN_LOOPS >= 1 :
         MR_MAIN_LOOPS -= 1
-        MR_REMAIN = 4
+        MR_REMAIN = 2
         MR_REMAIN_LOOPS = 2
-    elif MR_MAIN == 4 :
-      if MR_REMAIN == 1 and MR_MAIN_LOOPS >= 2 :
-        MR_MAIN_LOOPS -= 2
-        MR_REMAIN = 3
-        MR_REMAIN_LOOPS = 3
-      elif MR_REMAIN == 2 and MR_MAIN_LOOPS >= 1 :
-          MR_MAIN_LOOPS -= 1
-          MR_REMAIN = 3
-          MR_REMAIN_LOOPS = 2
-    elif MR_MAIN == 3 and MR_REMAIN == 1 and MR_MAIN_LOOPS >= 1 :
-      MR_MAIN_LOOPS -= 1
-      MR_REMAIN = 2
-      MR_REMAIN_LOOPS = 2
     
     return MR_MAIN, MR_MAIN_LOOPS, MR_REMAIN, MR_REMAIN_LOOPS
 
@@ -612,7 +624,7 @@ def RBSA(M, N, NR_MAIN):
 def laf_asm_code(M, N, K, lda, ldb, ldc, UNROLL_K = 8, NR_MAIN = 4, with_bias = 0):
 
     assert (UNROLL_K % (2*SIMD_LANE) == 0)
-    assert (NR_MAIN == 3 or NR_MAIN == 4 or NR_MAIN == 5)
+    assert (NR_MAIN == 4)
 
     NR_MAIN_LOOPS, NR_REMAIN, NR_REMAIN_LOOPS, NR_MAIN_MR_MAIN, NR_MAIN_MR_MAIN_LOOPS, NR_MAIN_MR_REMAIN, NR_MAIN_MR_REMAIN_LOOPS, NR_REMAIN_MR_MAIN, NR_REMAIN_MR_MAIN_LOOPS, NR_REMAIN_MR_REMAIN, NR_REMAIN_MR_REMAIN_LOOPS = RBSA(M, N, NR_MAIN)
 
@@ -742,7 +754,7 @@ int main() {{
   }}
 
   float latency = t.getTime();
-  float gflops = {ori_M} * {ori_N} * K * 2 / latency * n_loops / 1000000;
+  float gflops = {real_cal_M} * {real_cal_N} * K * 2 / latency * n_loops / 1000000;
   printf("%.2f, ", gflops);
 
   bool ACC = false;

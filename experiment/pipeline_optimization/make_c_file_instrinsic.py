@@ -1,5 +1,6 @@
 # gemm intrinsic implementations
 # compile by g++
+# corresponding to optimization a)
 
 import random
 import string

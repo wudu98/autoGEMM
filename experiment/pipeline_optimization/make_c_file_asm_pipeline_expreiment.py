@@ -14,6 +14,12 @@ UNROLL_K = int(sys.argv[4])
 NR_MAIN = int(sys.argv[5])
 repeat = int(sys.argv[6])
 
+Pipeline_strategy_level = int(sys.argv[7])
+# 0 - optimization b)
+# 1 - optimization c)
+# 2 - optimization d)
+# 3 - optimization e)
+
 SIMD_LANE = 4
 assert (SIMD_LANE == 4)
 
@@ -92,16 +98,6 @@ def micro_kernel_loop_asm(LOOP_ID, LAST_K_ID, LINES, COLS, real_lines, real_cols
       if LOOP_K_END_FLAG and LOOP_ID == LAST_K_ID:
         continue
 
-      # Get next block A address
-      if (REG_BLOCK_TRANS_FLAG and LOOP_ID == LAST_K_ID and line == 0 and col == 0):
-        for j in range(next_lines):
-          if (j == 0):
-            code_str += f"    \"mov     x{RESERVED_REG_NUM+LINES}, x10    \\n\"\n"
-          elif(j == 1):
-            code_str += f"    \"add     x{RESERVED_REG_NUM+LINES+1}, x10, x6    \\n\"\n"
-          else:
-            code_str += f"    \"add     x{RESERVED_REG_NUM+LINES+j}, x{RESERVED_REG_NUM+LINES+j-2}, x6, lsl #1    \\n\"\n"
-      
       if not WITH_BIAS_FLAG:
         # Get next block C address
         if (REG_BLOCK_TRANS_FLAG and LOOP_ID == LAST_K_ID and line == LINES - 1 and col == COLS//UNROLL_N - 1):
@@ -127,6 +123,16 @@ def micro_kernel_loop_asm(LOOP_ID, LAST_K_ID, LINES, COLS, real_lines, real_cols
           for j in range(UNROLL_N):
             if(line < next_lines and SIMD_LANE*UNROLL_N*col + SIMD_LANE*j < next_cols):
               code_str += f"    \"ldr     q{line*COLS + col*UNROLL_N + j}, [x{RESERVED_REG_NUM+line}, #{(col*UNROLL_N + j)*16}]           \\n\"\n"
+
+      # Get next block A address
+      if (REG_BLOCK_TRANS_FLAG and LOOP_ID == LAST_K_ID and line == 0 and col == 0):
+        for j in range(next_lines):
+          if (j == 0):
+            code_str += f"    \"mov     x{RESERVED_REG_NUM+LINES}, x10    \\n\"\n"
+          elif(j == 1):
+            code_str += f"    \"add     x{RESERVED_REG_NUM+LINES+1}, x10, x6    \\n\"\n"
+          else:
+            code_str += f"    \"add     x{RESERVED_REG_NUM+LINES+j}, x{RESERVED_REG_NUM+LINES+j-2}, x6, lsl #1    \\n\"\n"
 
       # Load next A in vector register
       if not REG_BLOCK_TRANS_FLAG :
@@ -159,7 +165,7 @@ def micro_kernel_loop_asm(LOOP_ID, LAST_K_ID, LINES, COLS, real_lines, real_cols
           # Load next block A
           if(LOOP_ID == LAST_K_ID and line < next_lines and col == (real_cols+SIMD_LANE-1)//SIMD_LANE//UNROLL_N - 1) :
             if A_odd_flag == 0 or line >= real_lines - VEC_REG_A_LEN % real_lines:
-              code_str += f"    \"ldr     q{vector_scroll_A[0][line]}, [x{RESERVED_REG_NUM+LINES+line}]    \\n\"\n"
+              code_str += f"    \"ldr     q{vector_scroll_A[0][line]}, [x{RESERVED_REG_NUM+LINES+line}], #16    \\n\"\n"
 
       # Sequence Load next B in vector register
       if (line == LINES - 1):
@@ -179,9 +185,7 @@ def micro_kernel_loop_asm(LOOP_ID, LAST_K_ID, LINES, COLS, real_lines, real_cols
     # Extra operations ensure that load next block A works correctly
     if REG_BLOCK_TRANS_FLAG and LOOP_ID == LAST_K_ID and WITH_BIAS_FLAG:
       for line in range(next_lines):
-        if A_odd_flag == 0 or line >= real_lines - VEC_REG_A_LEN % real_lines:
-          code_str += f"    \"add     x{RESERVED_REG_NUM+LINES+line}, x{RESERVED_REG_NUM+LINES+line}, #16             \\n\"\n"
-        else :
+        if not (A_odd_flag == 0 or line >= real_lines - VEC_REG_A_LEN % real_lines):
           code_str += f"    \"ldr     q{vector_scroll_A[0][line]}, [x{RESERVED_REG_NUM+LINES+line}], #16    \\n\"\n"
     
     # Extra operations ensure that Load next block B works correctly
@@ -298,27 +302,29 @@ def compile_time_for_m_dim_micro_kernel_pipeline_func_asm(LINES, COLS, K, UNROLL
     STORE_C_FLAG = 1
     WITH_BIAS_FLAG = with_bias
     
-    # _, REMAIN_K_LOOP_BEGIN = UNROLL_LOOP_ID(K, UNROLL_K)
-    # REMAIN_K_LOOP_END = UNROLL_K if K % UNROLL_K == 0 else K % UNROLL_K
+    _, REMAIN_K_LOOP_BEGIN = UNROLL_LOOP_ID(K, UNROLL_K)
+    REMAIN_K_LOOP_END = UNROLL_K if K % UNROLL_K == 0 else K % UNROLL_K
     
     code_str = f""
 
-    # for line in range(real_lines):
-    #   code_str += f"    \"prfm    PSTL1KEEP, [x{RESERVED_REG_NUM+line}, #64]              \\n\"\n"
+    if Pipeline_strategy_level < 3: 
+      code_str += compile_time_for_loop_k_end_func_asm(LINES, COLS, K, UNROLL_K, real_lines, real_cols, vector_id_array_A, VEC_REG_A_LEN, vector_id_array_B, VEC_REG_B_LEN, register_scroll_B)
+      FMA_CALCULATE_FLAG = 0
+      STORE_C_FLAG = 0
+      code_str += micro_kernel_loop_asm(-1, -1, LINES, COLS, real_lines, real_cols, next_lines, next_cols, vector_id_array_A, VEC_REG_A_LEN, vector_id_array_B, VEC_REG_B_LEN, register_scroll_B, LOOP_K_BEGIN_FLAG, LOOP_K_END_FLAG, REG_BLOCK_TRANS_FLAG, FMA_CALCULATE_FLAG, STORE_C_FLAG, WITH_BIAS_FLAG)
 
-    # for LOOP_ID in range(REMAIN_K_LOOP_BEGIN, REMAIN_K_LOOP_END):
-    #   code_str += micro_kernel_loop_asm(LOOP_ID, REMAIN_K_LOOP_END-1, LINES, COLS, real_lines, real_cols, next_lines, next_cols, vector_id_array_A, VEC_REG_A_LEN, vector_id_array_B, VEC_REG_B_LEN, register_scroll_B, LOOP_K_BEGIN_FLAG, LOOP_K_END_FLAG, REG_BLOCK_TRANS_FLAG, FMA_CALCULATE_FLAG, STORE_C_FLAG, WITH_BIAS_FLAG)
+    else:
+      for line in range(real_lines):
+        code_str += f"    \"prfm    PSTL1KEEP, [x{RESERVED_REG_NUM+line}, #64]              \\n\"\n"
 
-    # # When K module UNROLL_K remainder 1, no calculation, direct store
-    # if (REMAIN_K_LOOP_BEGIN == REMAIN_K_LOOP_END):
-    #   FMA_CALCULATE_FLAG = 0
-    #   code_str += micro_kernel_loop_asm(-1, -1, LINES, COLS, real_lines, real_cols, next_lines, next_cols, vector_id_array_A, VEC_REG_A_LEN, vector_id_array_B, VEC_REG_B_LEN, register_scroll_B, LOOP_K_BEGIN_FLAG, LOOP_K_END_FLAG, REG_BLOCK_TRANS_FLAG, FMA_CALCULATE_FLAG, STORE_C_FLAG, WITH_BIAS_FLAG)
+      for LOOP_ID in range(REMAIN_K_LOOP_BEGIN, REMAIN_K_LOOP_END):
+        code_str += micro_kernel_loop_asm(LOOP_ID, REMAIN_K_LOOP_END-1, LINES, COLS, real_lines, real_cols, next_lines, next_cols, vector_id_array_A, VEC_REG_A_LEN, vector_id_array_B, VEC_REG_B_LEN, register_scroll_B, LOOP_K_BEGIN_FLAG, LOOP_K_END_FLAG, REG_BLOCK_TRANS_FLAG, FMA_CALCULATE_FLAG, STORE_C_FLAG, WITH_BIAS_FLAG)
 
-    code_str += compile_time_for_loop_k_end_func_asm(LINES, COLS, K, UNROLL_K, real_lines, real_cols, vector_id_array_A, VEC_REG_A_LEN, vector_id_array_B, VEC_REG_B_LEN, register_scroll_B)
-    FMA_CALCULATE_FLAG = 0
-    STORE_C_FLAG = 0
-    code_str += micro_kernel_loop_asm(-1, -1, LINES, COLS, real_lines, real_cols, next_lines, next_cols, vector_id_array_A, VEC_REG_A_LEN, vector_id_array_B, VEC_REG_B_LEN, register_scroll_B, LOOP_K_BEGIN_FLAG, LOOP_K_END_FLAG, REG_BLOCK_TRANS_FLAG, FMA_CALCULATE_FLAG, STORE_C_FLAG, WITH_BIAS_FLAG)
-
+      # When K module UNROLL_K remainder 1, no calculation, direct store
+      if (REMAIN_K_LOOP_BEGIN == REMAIN_K_LOOP_END):
+        FMA_CALCULATE_FLAG = 0
+        code_str += micro_kernel_loop_asm(-1, -1, LINES, COLS, real_lines, real_cols, next_lines, next_cols, vector_id_array_A, VEC_REG_A_LEN, vector_id_array_B, VEC_REG_B_LEN, register_scroll_B, LOOP_K_BEGIN_FLAG, LOOP_K_END_FLAG, REG_BLOCK_TRANS_FLAG, FMA_CALCULATE_FLAG, STORE_C_FLAG, WITH_BIAS_FLAG)
+      
     return code_str
 
 def compile_time_for_n_dim_micro_kernel_pipeline_func_asm(LINES, COLS, K, UNROLL_K, real_lines, real_cols, next_lines, next_cols, vector_id_array_A, VEC_REG_A_LEN, vector_id_array_B, VEC_REG_B_LEN, register_scroll_B, with_bias):
@@ -329,27 +335,29 @@ def compile_time_for_n_dim_micro_kernel_pipeline_func_asm(LINES, COLS, K, UNROLL
     STORE_C_FLAG = 1
     WITH_BIAS_FLAG = with_bias
 
-    # _, REMAIN_K_LOOP_BEGIN = UNROLL_LOOP_ID(K, UNROLL_K)
-    # REMAIN_K_LOOP_END = UNROLL_K if K % UNROLL_K == 0 else K % UNROLL_K
+    _, REMAIN_K_LOOP_BEGIN = UNROLL_LOOP_ID(K, UNROLL_K)
+    REMAIN_K_LOOP_END = UNROLL_K if K % UNROLL_K == 0 else K % UNROLL_K
     
     code_str = f""
 
-    for line in range(real_lines):
-      code_str += f"    \"prfm    PSTL1KEEP, [x{RESERVED_REG_NUM+line}, #64]              \\n\"\n"
+    if Pipeline_strategy_level < 3: 
+      code_str += compile_time_for_loop_k_end_func_asm(LINES, COLS, K, UNROLL_K, real_lines, real_cols, vector_id_array_A, VEC_REG_A_LEN, vector_id_array_B, VEC_REG_B_LEN, register_scroll_B)
+      FMA_CALCULATE_FLAG = 0
+      STORE_C_FLAG = 0
+      code_str += micro_kernel_loop_asm(-1, -1, LINES, COLS, real_lines, real_cols, next_lines, next_cols, vector_id_array_A, VEC_REG_A_LEN, vector_id_array_B, VEC_REG_B_LEN, register_scroll_B, LOOP_K_BEGIN_FLAG, LOOP_K_END_FLAG, REG_BLOCK_TRANS_FLAG, FMA_CALCULATE_FLAG, STORE_C_FLAG, WITH_BIAS_FLAG)
 
-    # for LOOP_ID in range(REMAIN_K_LOOP_BEGIN, REMAIN_K_LOOP_END):
-    #   code_str += micro_kernel_loop_asm(LOOP_ID, REMAIN_K_LOOP_END-1, LINES, COLS, real_lines, real_cols, next_lines, next_cols, vector_id_array_A, VEC_REG_A_LEN, vector_id_array_B, VEC_REG_B_LEN, register_scroll_B, LOOP_K_BEGIN_FLAG, LOOP_K_END_FLAG, REG_BLOCK_TRANS_FLAG, FMA_CALCULATE_FLAG, STORE_C_FLAG, WITH_BIAS_FLAG)
+    else:
+      for line in range(real_lines):
+        code_str += f"    \"prfm    PSTL1KEEP, [x{RESERVED_REG_NUM+line}, #64]              \\n\"\n"
 
-    # # When K module UNROLL_K remainder 1, no calculation, direct store
-    # if (REMAIN_K_LOOP_BEGIN == REMAIN_K_LOOP_END):
-    #   FMA_CALCULATE_FLAG = 0
-    #   code_str += micro_kernel_loop_asm(-1, -1, LINES, COLS, real_lines, real_cols, next_lines, next_cols, vector_id_array_A, VEC_REG_A_LEN, vector_id_array_B, VEC_REG_B_LEN, register_scroll_B, LOOP_K_BEGIN_FLAG, LOOP_K_END_FLAG, REG_BLOCK_TRANS_FLAG, FMA_CALCULATE_FLAG, STORE_C_FLAG, WITH_BIAS_FLAG)
+      for LOOP_ID in range(REMAIN_K_LOOP_BEGIN, REMAIN_K_LOOP_END):
+        code_str += micro_kernel_loop_asm(LOOP_ID, REMAIN_K_LOOP_END-1, LINES, COLS, real_lines, real_cols, next_lines, next_cols, vector_id_array_A, VEC_REG_A_LEN, vector_id_array_B, VEC_REG_B_LEN, register_scroll_B, LOOP_K_BEGIN_FLAG, LOOP_K_END_FLAG, REG_BLOCK_TRANS_FLAG, FMA_CALCULATE_FLAG, STORE_C_FLAG, WITH_BIAS_FLAG)
 
-    code_str += compile_time_for_loop_k_end_func_asm(LINES, COLS, K, UNROLL_K, real_lines, real_cols, vector_id_array_A, VEC_REG_A_LEN, vector_id_array_B, VEC_REG_B_LEN, register_scroll_B)
-    FMA_CALCULATE_FLAG = 0
-    STORE_C_FLAG = 0
-    code_str += micro_kernel_loop_asm(-1, -1, LINES, COLS, real_lines, real_cols, next_lines, next_cols, vector_id_array_A, VEC_REG_A_LEN, vector_id_array_B, VEC_REG_B_LEN, register_scroll_B, LOOP_K_BEGIN_FLAG, LOOP_K_END_FLAG, REG_BLOCK_TRANS_FLAG, FMA_CALCULATE_FLAG, STORE_C_FLAG, WITH_BIAS_FLAG)
-
+      # When K module UNROLL_K remainder 1, no calculation, direct store
+      if (REMAIN_K_LOOP_BEGIN == REMAIN_K_LOOP_END):
+        FMA_CALCULATE_FLAG = 0
+        code_str += micro_kernel_loop_asm(-1, -1, LINES, COLS, real_lines, real_cols, next_lines, next_cols, vector_id_array_A, VEC_REG_A_LEN, vector_id_array_B, VEC_REG_B_LEN, register_scroll_B, LOOP_K_BEGIN_FLAG, LOOP_K_END_FLAG, REG_BLOCK_TRANS_FLAG, FMA_CALCULATE_FLAG, STORE_C_FLAG, WITH_BIAS_FLAG)
+    
     return code_str
 
 def compile_time_for_loop_k_end_func_asm(LINES, COLS, K, UNROLL_K, real_lines, real_cols, vector_id_array_A, VEC_REG_A_LEN, vector_id_array_B, VEC_REG_B_LEN, register_scroll_B):
@@ -357,7 +365,10 @@ def compile_time_for_loop_k_end_func_asm(LINES, COLS, K, UNROLL_K, real_lines, r
     LOOP_K_END_FLAG = 1
     REG_BLOCK_TRANS_FLAG = 0
     FMA_CALCULATE_FLAG = 1
-    STORE_C_FLAG = 0 # ori is 1
+    if Pipeline_strategy_level < 2: 
+      STORE_C_FLAG = 0
+    else:
+      STORE_C_FLAG = 1
     WITH_BIAS_FLAG = 0
 
     _, REMAIN_K_LOOP_BEGIN = UNROLL_LOOP_ID(K, UNROLL_K)
@@ -376,9 +387,12 @@ def compile_time_for_loop_k_end_func_asm(LINES, COLS, K, UNROLL_K, real_lines, r
       FMA_CALCULATE_FLAG = 0
       code_str += micro_kernel_loop_asm(-1, -1, LINES, COLS, real_lines, real_cols, real_lines, real_cols, vector_id_array_A, VEC_REG_A_LEN, vector_id_array_B, VEC_REG_B_LEN, register_scroll_B, LOOP_K_BEGIN_FLAG, LOOP_K_END_FLAG, REG_BLOCK_TRANS_FLAG, FMA_CALCULATE_FLAG, STORE_C_FLAG, WITH_BIAS_FLAG)
 
-    FMA_CALCULATE_FLAG = 0
-    STORE_C_FLAG = 1
-    code_str += micro_kernel_loop_asm(-1, -1, LINES, COLS, real_lines, real_cols, real_lines, real_cols, vector_id_array_A, VEC_REG_A_LEN, vector_id_array_B, VEC_REG_B_LEN, register_scroll_B, LOOP_K_BEGIN_FLAG, LOOP_K_END_FLAG, REG_BLOCK_TRANS_FLAG, FMA_CALCULATE_FLAG, STORE_C_FLAG, WITH_BIAS_FLAG)
+    if Pipeline_strategy_level < 2: 
+      FMA_CALCULATE_FLAG = 0
+      STORE_C_FLAG = 1
+      code_str += micro_kernel_loop_asm(-1, -1, LINES, COLS, real_lines, real_cols, real_lines, real_cols, vector_id_array_A, VEC_REG_A_LEN, vector_id_array_B, VEC_REG_B_LEN, register_scroll_B, LOOP_K_BEGIN_FLAG, LOOP_K_END_FLAG, REG_BLOCK_TRANS_FLAG, FMA_CALCULATE_FLAG, STORE_C_FLAG, WITH_BIAS_FLAG)
+
+
     return code_str
 
 
@@ -477,7 +491,10 @@ def n_dim_func_asm(REMAIN_N, K, UNROLL_K, NR, NR_LOOPS, MR_MAIN, MR_MAIN_LOOPS, 
     for i in range(MR_MAIN*NR, MR_MAIN*NR+VEC_REG_B_LEN):
       vector_id_array_B.append(i)
 
-    VEC_REG_A_LEN = MR_MAIN #if K <= 16 else min(32 - MR_MAIN*NR - VEC_REG_B_LEN, 2*MR_MAIN)
+    if Pipeline_strategy_level < 1: 
+      VEC_REG_A_LEN = MR_MAIN
+    else:
+      VEC_REG_A_LEN = MR_MAIN if K <= 16 else min(32 - MR_MAIN*NR - VEC_REG_B_LEN, 2*MR_MAIN)
 
     vector_id_array_A = []
     for i in range(MR_MAIN*NR+VEC_REG_B_LEN, MR_MAIN*NR+VEC_REG_B_LEN+VEC_REG_A_LEN):

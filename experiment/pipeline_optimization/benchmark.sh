@@ -29,23 +29,23 @@ do
 		
 		echo -n $M, $N, $K," " 
 
-		python make_c_file_base.py $M $N $K $UNROLL $NR $REPEAT
+		python make_c_file_instrinsic.py $M $N $K $UNROLL $NR $REPEAT
 		make -s
 		./benchmark_kernel
 
-		python make_c_file_asm_v1.py $M $N $K $UNROLL $NR $REPEAT
+		python make_c_file_asm_pipeline_expreiment.py $M $N $K $UNROLL $NR $REPEAT 0
 		make -s
 		./benchmark_kernel
 
-		python make_c_file_asm_v2.py $M $N $K $UNROLL $NR $REPEAT
+		python make_c_file_asm_pipeline_expreiment.py $M $N $K $UNROLL $NR $REPEAT 1
 		make -s
 		./benchmark_kernel
 
-		python make_c_file_asm_v3.py $M $N $K $UNROLL $NR $REPEAT
+		python make_c_file_asm_pipeline_expreiment.py $M $N $K $UNROLL $NR $REPEAT 2
 		make -s
 		./benchmark_kernel
 
-		python make_c_file_asm_v4_all.py $M $N $K $UNROLL $NR $REPEAT
+		python make_c_file_asm_pipeline_expreiment.py $M $N $K $UNROLL $NR $REPEAT 3
 		make -s
 		./benchmark_kernel
 

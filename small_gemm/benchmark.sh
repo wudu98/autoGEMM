@@ -8,13 +8,10 @@ cd ${PROJECT_ROOT}
 UNROLL=8
 TOT_REPEAT=65536000000
 
-# for M in $(seq 1 1 128)
-# do
-	# N=$M
-	# K=$M
-	M=5
-	N=16
-	K=128
+for M in $(seq 1 1 128)
+do
+	N=$M
+	K=$M
 	REPEAT=`expr $TOT_REPEAT / $M / $N / $K`
 	if test $REPEAT -gt 1000000000
 	then
@@ -26,4 +23,4 @@ TOT_REPEAT=65536000000
 		make -s
 		./benchmark_kernel
 	done
-# done
+done

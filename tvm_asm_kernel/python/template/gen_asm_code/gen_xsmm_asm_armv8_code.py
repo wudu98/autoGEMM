@@ -76,16 +76,6 @@ def micro_kernel_loop_asm(LOOP_ID, LAST_K_ID, LINES, COLS, real_lines, real_cols
       if LOOP_K_END_FLAG and LOOP_ID == LAST_K_ID:
         continue
 
-      # Get next block A address
-      if (REG_BLOCK_TRANS_FLAG and LOOP_ID == LAST_K_ID and line == 0 and col == 0):
-        for j in range(next_lines):
-          if (j == 0):
-            code_str += f"    \"mov     x{RESERVED_REG_NUM+LINES}, x10    \\n\"\n"
-          elif(j == 1):
-            code_str += f"    \"add     x{RESERVED_REG_NUM+LINES+1}, x10, x6    \\n\"\n"
-          else:
-            code_str += f"    \"add     x{RESERVED_REG_NUM+LINES+j}, x{RESERVED_REG_NUM+LINES+j-2}, x6, lsl #1    \\n\"\n"
-      
       if not WITH_BIAS_FLAG:
         # Get next block C address
         if (REG_BLOCK_TRANS_FLAG and LOOP_ID == LAST_K_ID and line == LINES - 1 and col == COLS//UNROLL_N - 1):
@@ -111,6 +101,16 @@ def micro_kernel_loop_asm(LOOP_ID, LAST_K_ID, LINES, COLS, real_lines, real_cols
           for j in range(UNROLL_N):
             if(line < next_lines and SIMD_LANE*UNROLL_N*col + SIMD_LANE*j < next_cols):
               code_str += f"    \"ldr     q{line*COLS + col*UNROLL_N + j}, [x{RESERVED_REG_NUM+line}, #{(col*UNROLL_N + j)*16}]           \\n\"\n"
+
+      # Get next block A address
+      if (REG_BLOCK_TRANS_FLAG and LOOP_ID == LAST_K_ID and line == 0 and col == 0):
+        for j in range(next_lines):
+          if (j == 0):
+            code_str += f"    \"mov     x{RESERVED_REG_NUM+LINES}, x10    \\n\"\n"
+          elif(j == 1):
+            code_str += f"    \"add     x{RESERVED_REG_NUM+LINES+1}, x10, x6    \\n\"\n"
+          else:
+            code_str += f"    \"add     x{RESERVED_REG_NUM+LINES+j}, x{RESERVED_REG_NUM+LINES+j-2}, x6, lsl #1    \\n\"\n"
 
       # Load next A in vector register
       if not REG_BLOCK_TRANS_FLAG :
@@ -143,7 +143,7 @@ def micro_kernel_loop_asm(LOOP_ID, LAST_K_ID, LINES, COLS, real_lines, real_cols
           # Load next block A
           if(LOOP_ID == LAST_K_ID and line < next_lines and col == (real_cols+SIMD_LANE-1)//SIMD_LANE//UNROLL_N - 1) :
             if A_odd_flag == 0 or line >= real_lines - VEC_REG_A_LEN % real_lines:
-              code_str += f"    \"ldr     q{vector_scroll_A[0][line]}, [x{RESERVED_REG_NUM+LINES+line}]    \\n\"\n"
+              code_str += f"    \"ldr     q{vector_scroll_A[0][line]}, [x{RESERVED_REG_NUM+LINES+line}], #16    \\n\"\n"
 
       # Sequence Load next B in vector register
       if (line == LINES - 1):
@@ -163,9 +163,7 @@ def micro_kernel_loop_asm(LOOP_ID, LAST_K_ID, LINES, COLS, real_lines, real_cols
     # Extra operations ensure that load next block A works correctly
     if REG_BLOCK_TRANS_FLAG and LOOP_ID == LAST_K_ID and WITH_BIAS_FLAG:
       for line in range(next_lines):
-        if A_odd_flag == 0 or line >= real_lines - VEC_REG_A_LEN % real_lines:
-          code_str += f"    \"add     x{RESERVED_REG_NUM+LINES+line}, x{RESERVED_REG_NUM+LINES+line}, #16             \\n\"\n"
-        else :
+        if not (A_odd_flag == 0 or line >= real_lines - VEC_REG_A_LEN % real_lines):
           code_str += f"    \"ldr     q{vector_scroll_A[0][line]}, [x{RESERVED_REG_NUM+LINES+line}], #16    \\n\"\n"
     
     # Extra operations ensure that Load next block B works correctly

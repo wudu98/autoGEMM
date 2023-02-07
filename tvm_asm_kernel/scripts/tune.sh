@@ -10,6 +10,8 @@ export TVM_CC=clang++
 
 tune_output_path="tune_output"
 tune_num=$1
+parallel="--parallel"
+offline="--offline"
 
 if [[ -d $tune_output_path ]]; then
     rm -rf $tune_output_path
@@ -27,7 +29,7 @@ do
     M=`echo $line | awk '{print $1}'`
     N=`echo $line | awk '{print $2}'`
     K=`echo $line | awk '{print $3}'`
-    python ${PROJECT_ROOT}/python/tune_scheduler.py -m ${M} -n ${N} -k ${K} -s ${tune_num} -r $tune_output_path/matmul.log > $tune_output_path/perf/${cnt}_matmul_${M}_${N}_${K}.perf
+    python ${PROJECT_ROOT}/python/tune_scheduler.py -m ${M} -n ${N} -k ${K} -s ${tune_num} ${parallel} ${offline} -r $tune_output_path/matmul.log > $tune_output_path/perf/${cnt}_matmul_${M}_${N}_${K}.perf
     cp $tune_output_path/matmul.log.tmp $tune_output_path/log/${cnt}_matmul_${M}_${N}_${K}.log
     python ${PROJECT_ROOT}/python/summarize_scheduler.py --input $tune_output_path/matmul.log --output $tune_output_path/scheduler_summary.log
     let cnt+=1

@@ -10,6 +10,8 @@ export TVM_CC=clang++
 
 build_output_path="build"
 tune_output_path="tune_output"
+parallel="--parallel"
+offline="--offline"
 
 if [[ -d $build_output_path ]]; then
     rm -rf $build_output_path
@@ -26,6 +28,8 @@ cd $build_output_path
 
 python ${PROJECT_ROOT}/python/evaluate_scheduler.py \
     --MNK_file $MNK_file \
-    --scheduler_log scheduler_summary.log
+    --scheduler_log scheduler_summary.log \
+    ${tune_num} \
+    ${parallel}
 
 touch build.over

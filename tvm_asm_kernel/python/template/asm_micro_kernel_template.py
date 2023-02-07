@@ -8,10 +8,10 @@ from template.gen_asm_code.tvm_extern_asm_micro_kernel import intrin_gemm_MxKxN,
 dtype = "float32"
 
 @autotvm.template("matmul")
-def matmul(M, K, N):
+def matmul(M, K, N, offline_pack, parallel):
     cfg = autotvm.get_config()
 
-    # Tiling structure: split M/N into 3 axes, K into 2 axes.
+    # Tiling structure: split M/N/K into 3 axes each.
     cfg.define_split("tile_x", M, num_outputs=3)
     cfg.define_split("tile_y", N, num_outputs=3)
     cfg.define_split("tile_k", K, num_outputs=2)
@@ -33,7 +33,16 @@ def matmul(M, K, N):
     kn = cfg['tile_k'].size[-1]
     bn_ceil = ((bn - 1) // padding_size + 1) * padding_size
 
-    PackedB = te.placeholder((K // kn, N // bn, kn, bn_ceil), name='PackedB')
+    if offline_pack :
+        PackedB = te.placeholder((K // kn, N // bn, kn, bn_ceil), name='PackedB')
+    else :
+        B = te.placeholder((K, N), name="B")
+        PackedB = te.compute(
+            (K // kn, N // bn, kn, bn_ceil), 
+            lambda i, x, y, z: te.if_then_else(
+                z < bn, B[i * kn + y, x * bn + z], 0
+            ), name="PackedB"
+        )
 
     k = te.reduce_axis((0, K), "k")
 
@@ -56,11 +65,25 @@ def matmul(M, K, N):
     # Make (yi, xi, ki) the inner most axes, to be tensorized later.
     s[C].reorder(yt, xt, yo, ko, xo, yi, xi, ki)
 
-    # Let autotvm to find the best order of the 5 axes:
-    cfg.define_reorder("reorder_outer", [yt, xt], "all")
-    cfg["reorder_outer"].apply(s, C, [yt, xt])
-    cfg.define_reorder("reorder_inner", [yo, ko, xo], "all")
-    cfg["reorder_inner"].apply(s, C, [yo, ko, xo])
+    # Let autotvm to find the best order of the 6 axes:
+    cfg.define_reorder("reorder_outer", [yt, xt, yo, ko, xo], "all")
+    new_order = cfg["reorder_outer"].apply(s, C, [yt, xt, yo, ko, xo])
+
+    if parallel :
+        # Fuse the outmost non-reducution axes.
+        sibling_axes = []
+        for axis in new_order:
+            if axis not in [ko]:
+                sibling_axes.append(axis)
+            else:
+                break
+
+        parallel_axis = s[C].fuse(*sibling_axes)
+
+        assert parallel_axis is not None
+        s[C].parallel(parallel_axis)
+
+    pragma_axis = parallel_axis if parallel else xo
 
     # Inner kernel implementation for the tensorization.
     micro_kernel, uniq_id = intrin_gemm_MxKxN(
@@ -72,7 +95,7 @@ def matmul(M, K, N):
                                 N,
                                 )
     s[C].tensorize(yi, micro_kernel)
-    s[C].pragma(xt, "import_llvm", gemm_MxKxN_impl(
+    s[C].pragma(pragma_axis, "import_llvm", gemm_MxKxN_impl(
                                 cfg["tile_x"].size[-1],
                                 cfg["tile_k"].size[-1], 
                                 cfg["tile_y"].size[-1],
@@ -84,4 +107,7 @@ def matmul(M, K, N):
                                 uniq_id
                                 ))
 
-    return s, [A, PackedB, C]
+    if offline_pack :
+        return s, [A, PackedB, C]
+    else :
+        return s, [A, B, C]

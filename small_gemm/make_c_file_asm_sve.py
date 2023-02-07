@@ -729,8 +729,8 @@ def gemm_MxKxN_impl(M, K, N, lda, ldb, ldc, uniq_id):
 #include <cassert>
 #include <cstdlib>
 #include <cstdio>
-#include "../test.h"
-#include "../timer.h"
+#include "./test.h"
+#include "./timer.h"
 
 namespace laf {{
 void small_gemm(const float *A, const float *B, float *C, int lda, int ldb, int ldc) {{

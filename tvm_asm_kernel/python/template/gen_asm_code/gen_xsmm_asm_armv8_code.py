@@ -1,7 +1,13 @@
 SIMD_LANE = 4
 assert (SIMD_LANE == 4)
 
-RESERVED_REG_NUM = 16
+CONST_UNROLL_LANE = 4
+assert (CONST_UNROLL_LANE == 4)
+
+DATA_BYTE = 4
+assert (DATA_BYTE == 4)
+
+RESERVED_REG_NUM = 6
 
 # print('M=%d, N=%d, K=%d' % (M, N, K))
 
@@ -14,28 +20,28 @@ def micro_kernel_loop_asm(LOOP_ID, LAST_K_ID, LINES, COLS, real_lines, real_cols
     if LOOP_ID == LAST_K_ID and WITH_BIAS_FLAG :
       UNROLL_N = COLS
 
-    A_odd_flag = (LOOP_ID // SIMD_LANE) % 2
+    A_odd_flag = (LOOP_ID // CONST_UNROLL_LANE) % 2
     B_odd_flag = ((LOOP_ID * COLS + VEC_REG_B_LEN) // COLS) % 2
     ptr_B_POS = (LOOP_ID * COLS + VEC_REG_B_LEN) % COLS 
-    mod_simd_lane_loop_id = LOOP_ID % SIMD_LANE
+    mod_simd_lane_loop_id = LOOP_ID % CONST_UNROLL_LANE
 
     vector_scroll_A = [[], []]
     vector_scroll_A[0] = [ vector_id_array_A[i] for i in range(LINES)]
     vector_scroll_A[1] = [ vector_id_array_A[(i+real_lines)%VEC_REG_A_LEN ] for i in range(real_lines) ]
-
+    
     vector_scroll_B = [(i + LOOP_ID * COLS) % VEC_REG_B_LEN for i in range(COLS)]
 
     # Initializes the ABC Block pointer
     if REG_BLOCK_TRANS_FLAG and LOOP_ID == LAST_K_ID:
       if REG_BLOCK_TRANS_FLAG == 2 :
-        code_str += f"    \"mov     x10, %[A]                 \\n\"\n"
-        code_str += f"    \"add     %[B], %[B], #{real_cols * 4}                 \\n\"\n"
-        code_str += f"    \"add     %[C], %[C], #{real_cols * 4}                 \\n\"\n"
-        code_str += f"    \"mov     x13, %[C]                 \\n\"\n"
-      code_str += f"    \"mov     x11, %[B]                   \\n\"\n"
-      code_str += f"    \"add     x12, %[B], %[ldb], lsl #2               \\n\"\n" 
-      code_str += f"    \"prfm    PLDL1KEEP, [x11, #64]              \\n\"\n"
-      code_str += f"    \"prfm    PLDL1KEEP, [x12, #64]              \\n\"\n"
+        code_str += f"    \"mov     x21, %[A]                 \\n\"\n"
+        code_str += f"    \"add     %[B], %[B], #{real_cols * DATA_BYTE}                 \\n\"\n"
+        code_str += f"    \"add     %[C], %[C], #{real_cols * DATA_BYTE}                 \\n\"\n"
+        code_str += f"    \"mov     x24, %[C]                 \\n\"\n"
+      code_str += f"    \"mov     x22, %[B]                   \\n\"\n"
+      code_str += f"    \"add     x23, %[B], %[ldb], lsr #1               \\n\"\n" 
+      code_str += f"    \"prfm    PLDL1KEEP, [x22, #64]              \\n\"\n"
+      code_str += f"    \"prfm    PLDL1KEEP, [x23, #64]              \\n\"\n"
       B_odd_flag = 0
 
     for i in range(LINES*COLS//UNROLL_N):
@@ -47,14 +53,14 @@ def micro_kernel_loop_asm(LOOP_ID, LAST_K_ID, LINES, COLS, real_lines, real_cols
         if(LOOP_ID == 0 and LOOP_K_BEGIN_FLAG and (not WITH_BIAS_FLAG)):
           for j in range(UNROLL_N):
             if(line < real_lines and SIMD_LANE*UNROLL_N*col + SIMD_LANE*j < real_cols):
-              code_str += f"    \"fmul    v{line*COLS + col*UNROLL_N + j}.4s, v{vector_id_array_B[vector_scroll_B[col*UNROLL_N + j]]}.4s, v{vector_scroll_A[A_odd_flag][line]}.s[{mod_simd_lane_loop_id}]             \\n\"\n"
+              code_str += f"    \"fmul    v{VEC_REG_A_LEN + VEC_REG_B_LEN + line*COLS + col*UNROLL_N + j}.4s, v{vector_id_array_B[vector_scroll_B[col*UNROLL_N + j]]}.4s, v{vector_scroll_A[A_odd_flag][line]}.s[{mod_simd_lane_loop_id}]             \\n\"\n"
         else:
           for j in range(UNROLL_N):
             if(line < real_lines and SIMD_LANE*UNROLL_N*col + SIMD_LANE*j < real_cols):
               if A_odd_flag == 1 and ((LOOP_ID == LAST_K_ID and not WITH_BIAS_FLAG) or (not LOOP_ID == LAST_K_ID and mod_simd_lane_loop_id == 3)) :
                 ori_line = line
                 line = (line + VEC_REG_A_LEN % real_lines) % real_lines
-              code_str += f"    \"fmla    v{line*COLS + col*UNROLL_N + j}.4s, v{vector_id_array_B[vector_scroll_B[col*UNROLL_N + j]]}.4s, v{vector_scroll_A[A_odd_flag][line]}.s[{mod_simd_lane_loop_id}]             \\n\"\n"
+              code_str += f"    \"fmla    v{VEC_REG_A_LEN + VEC_REG_B_LEN + line*COLS + col*UNROLL_N + j}.4s, v{vector_id_array_B[vector_scroll_B[col*UNROLL_N + j]]}.4s, v{vector_scroll_A[A_odd_flag][line]}.s[{mod_simd_lane_loop_id}]             \\n\"\n"
               if A_odd_flag == 1 and ((LOOP_ID == LAST_K_ID and not WITH_BIAS_FLAG) or (not LOOP_ID == LAST_K_ID and mod_simd_lane_loop_id == 3)) :
                 line = ori_line
                
@@ -66,10 +72,10 @@ def micro_kernel_loop_asm(LOOP_ID, LAST_K_ID, LINES, COLS, real_lines, real_cols
               ori_line = line
               line = (line + VEC_REG_A_LEN % real_lines) % real_lines
             if(SIMD_LANE*UNROLL_N*col + SIMD_LANE*(j+1) <= real_cols):
-              code_str += f"    \"str     q{line*COLS + col*UNROLL_N + j}, [x{RESERVED_REG_NUM+line}], #16           \\n\"\n"
+              code_str += f"    \"str     q{VEC_REG_A_LEN + VEC_REG_B_LEN + line*COLS + col*UNROLL_N + j}, [x{RESERVED_REG_NUM+line}], #{SIMD_LANE * DATA_BYTE}           \\n\"\n"
             else:
               for k in range(SIMD_LANE*UNROLL_N*col + SIMD_LANE*j, real_cols):
-                code_str += f"    \"st1     {{v{line*COLS + col*UNROLL_N + j}.s}}[{k%4}], [x{RESERVED_REG_NUM+line}], #4           \\n\"\n"
+                code_str += f"    \"st1     {{v{VEC_REG_A_LEN + VEC_REG_B_LEN + line*COLS + col*UNROLL_N + j}.s}}[{k%4}], [x{RESERVED_REG_NUM+line}], #{DATA_BYTE}           \\n\"\n"
             if A_odd_flag == 1 and (not WITH_BIAS_FLAG) :
               line = ori_line
       
@@ -81,36 +87,36 @@ def micro_kernel_loop_asm(LOOP_ID, LAST_K_ID, LINES, COLS, real_lines, real_cols
         if (REG_BLOCK_TRANS_FLAG and LOOP_ID == LAST_K_ID and line == LINES - 1 and col == COLS//UNROLL_N - 1):
           for j in range(next_lines):
             if (j == 0):
-              code_str += f"    \"mov     x{RESERVED_REG_NUM}, x13    \\n\"\n"
+              code_str += f"    \"mov     x{RESERVED_REG_NUM}, x24    \\n\"\n"
             elif(j == 1):
-              code_str += f"    \"add     x{RESERVED_REG_NUM+1}, x13, x9     \\n\"\n"
+              code_str += f"    \"add     x{RESERVED_REG_NUM+1}, x24, %[ldc]     \\n\"\n"
             else:
-              code_str += f"    \"add     x{RESERVED_REG_NUM+j}, x{RESERVED_REG_NUM+j-2}, x9, lsl #1    \\n\"\n"
+              code_str += f"    \"add     x{RESERVED_REG_NUM+j}, x{RESERVED_REG_NUM+j-2}, %[ldc], lsl #1    \\n\"\n"
       else:
         # Get next block C address
         if (REG_BLOCK_TRANS_FLAG and LOOP_ID == LAST_K_ID):
           if line < next_lines :
             if (line == 0):
-              code_str += f"    \"mov     x{RESERVED_REG_NUM}, x13    \\n\"\n"
+              code_str += f"    \"mov     x{RESERVED_REG_NUM}, x24    \\n\"\n"
             elif(line == 1):
-              code_str += f"    \"add     x{RESERVED_REG_NUM+1}, x13, x9     \\n\"\n"
+              code_str += f"    \"add     x{RESERVED_REG_NUM+1}, x24, %[ldc]     \\n\"\n"
             else:
-              code_str += f"    \"add     x{RESERVED_REG_NUM+line}, x{RESERVED_REG_NUM+line-2}, x9, lsl #1    \\n\"\n"
+              code_str += f"    \"add     x{RESERVED_REG_NUM+line}, x{RESERVED_REG_NUM+line-2}, %[ldc], lsl #1    \\n\"\n"
         # Load next block C in vector register
         if REG_BLOCK_TRANS_FLAG and LOOP_ID == LAST_K_ID:
           for j in range(UNROLL_N):
             if(line < next_lines and SIMD_LANE*UNROLL_N*col + SIMD_LANE*j < next_cols):
-              code_str += f"    \"ldr     q{line*COLS + col*UNROLL_N + j}, [x{RESERVED_REG_NUM+line}, #{(col*UNROLL_N + j)*16}]           \\n\"\n"
+              code_str += f"    \"ldr     q{VEC_REG_A_LEN + VEC_REG_B_LEN + line*COLS + col*UNROLL_N + j}, [x{RESERVED_REG_NUM+line}, #{(col*UNROLL_N + j)*(SIMD_LANE * DATA_BYTE)}]           \\n\"\n"
 
       # Get next block A address
       if (REG_BLOCK_TRANS_FLAG and LOOP_ID == LAST_K_ID and line == 0 and col == 0):
         for j in range(next_lines):
           if (j == 0):
-            code_str += f"    \"mov     x{RESERVED_REG_NUM+LINES}, x10    \\n\"\n"
+            code_str += f"    \"mov     x{RESERVED_REG_NUM+LINES}, x21    \\n\"\n"
           elif(j == 1):
-            code_str += f"    \"add     x{RESERVED_REG_NUM+LINES+1}, x10, x6    \\n\"\n"
+            code_str += f"    \"add     x{RESERVED_REG_NUM+LINES+1}, x21, %[lda]    \\n\"\n"
           else:
-            code_str += f"    \"add     x{RESERVED_REG_NUM+LINES+j}, x{RESERVED_REG_NUM+LINES+j-2}, x6, lsl #1    \\n\"\n"
+            code_str += f"    \"add     x{RESERVED_REG_NUM+LINES+j}, x{RESERVED_REG_NUM+LINES+j-2}, %[lda], lsl #1    \\n\"\n"
 
       # Load next A in vector register
       if not REG_BLOCK_TRANS_FLAG :
@@ -123,7 +129,7 @@ def micro_kernel_loop_asm(LOOP_ID, LAST_K_ID, LINES, COLS, real_lines, real_cols
             if(mod_simd_lane_loop_id == line % 3 and (line >= real_lines - VEC_REG_A_LEN % real_lines or 2 * real_lines <= VEC_REG_A_LEN)):
               if A_odd_flag == 0:
                 line = (line + VEC_REG_A_LEN % real_lines) % real_lines
-              code_str += f"    \"ldr     q{vector_scroll_A[A_odd_flag^1][line]}, [x{RESERVED_REG_NUM+LINES+line}], #16    \\n\"\n"
+              code_str += f"    \"ldr     q{vector_scroll_A[A_odd_flag^1][line]}, [x{RESERVED_REG_NUM+LINES+line}], #{CONST_UNROLL_LANE * DATA_BYTE}    \\n\"\n"
           line = ori_line
 
         if((LAST_K_ID == -1 or LOOP_ID < (LAST_K_ID - LAST_K_ID%4)) and mod_simd_lane_loop_id == 3 and line < real_lines and col == (real_cols+SIMD_LANE-1)//SIMD_LANE//UNROLL_N - 1):
@@ -131,19 +137,19 @@ def micro_kernel_loop_asm(LOOP_ID, LAST_K_ID, LINES, COLS, real_lines, real_cols
             if A_odd_flag == 0:
               ori_line = line
               line = (line + VEC_REG_A_LEN % real_lines) % real_lines
-            code_str += f"    \"ldr     q{vector_scroll_A[A_odd_flag^1][line]}, [x{RESERVED_REG_NUM+LINES+line}], #16    \\n\"\n"
+            code_str += f"    \"ldr     q{vector_scroll_A[A_odd_flag^1][line]}, [x{RESERVED_REG_NUM+LINES+line}], #{CONST_UNROLL_LANE * DATA_BYTE}    \\n\"\n"
             if A_odd_flag == 0:
               line = ori_line
       else :
         if not WITH_BIAS_FLAG:
           # Load next block A
           if(LOOP_ID == LAST_K_ID and line < next_lines and col == (real_cols+SIMD_LANE-1)//SIMD_LANE//UNROLL_N - 1) :
-            code_str += f"    \"ldr     q{vector_scroll_A[0][line]}, [x{RESERVED_REG_NUM+LINES+line}], #16    \\n\"\n"
+            code_str += f"    \"ldr     q{vector_scroll_A[0][line]}, [x{RESERVED_REG_NUM+LINES+line}], #{CONST_UNROLL_LANE * DATA_BYTE}    \\n\"\n"
         else:
           # Load next block A
           if(LOOP_ID == LAST_K_ID and line < next_lines and col == (real_cols+SIMD_LANE-1)//SIMD_LANE//UNROLL_N - 1) :
             if A_odd_flag == 0 or line >= real_lines - VEC_REG_A_LEN % real_lines:
-              code_str += f"    \"ldr     q{vector_scroll_A[0][line]}, [x{RESERVED_REG_NUM+LINES+line}], #16    \\n\"\n"
+              code_str += f"    \"ldr     q{vector_scroll_A[0][line]}, [x{RESERVED_REG_NUM+LINES+line}], #{CONST_UNROLL_LANE * DATA_BYTE}    \\n\"\n"
 
       # Sequence Load next B in vector register
       if (line == LINES - 1):
@@ -151,11 +157,11 @@ def micro_kernel_loop_asm(LOOP_ID, LAST_K_ID, LINES, COLS, real_lines, real_cols
           if(((not LOOP_ID == LAST_K_ID) or (LOOP_ID == LAST_K_ID and COLS == VEC_REG_B_LEN)) and SIMD_LANE*UNROLL_N*col + SIMD_LANE*j < real_cols):
             if (LOOP_ID == LAST_K_ID - 1 and UNROLL_N*col + j >= 2 * COLS - VEC_REG_B_LEN):
               continue
-            code_str += f"    \"ldr     q{vector_id_array_B[vector_scroll_B[col*UNROLL_N + j]]}, [x{register_scroll_B[B_odd_flag]}, #{(ptr_B_POS)*16}]             \\n\"\n"
+            code_str += f"    \"ldr     q{vector_id_array_B[vector_scroll_B[col*UNROLL_N + j]]}, [x{register_scroll_B[B_odd_flag]}, #{(ptr_B_POS)*(SIMD_LANE * DATA_BYTE)}]             \\n\"\n"
             # Get next B address
             if ptr_B_POS == COLS - 1:
               ptr_B_POS = 0
-              code_str += f"    \"add     x{register_scroll_B[B_odd_flag]}, x{register_scroll_B[B_odd_flag]}, x8              \\n\"\n"
+              code_str += f"    \"add     x{register_scroll_B[B_odd_flag]}, x{register_scroll_B[B_odd_flag]}, %[ldb]              \\n\"\n"
               B_odd_flag ^= 1
             else:
               ptr_B_POS += 1 
@@ -164,17 +170,17 @@ def micro_kernel_loop_asm(LOOP_ID, LAST_K_ID, LINES, COLS, real_lines, real_cols
     if REG_BLOCK_TRANS_FLAG and LOOP_ID == LAST_K_ID and WITH_BIAS_FLAG:
       for line in range(next_lines):
         if not (A_odd_flag == 0 or line >= real_lines - VEC_REG_A_LEN % real_lines):
-          code_str += f"    \"ldr     q{vector_scroll_A[0][line]}, [x{RESERVED_REG_NUM+LINES+line}], #16    \\n\"\n"
+          code_str += f"    \"ldr     q{vector_scroll_A[0][line]}, [x{RESERVED_REG_NUM+LINES+line}], #{CONST_UNROLL_LANE * DATA_BYTE}    \\n\"\n"
     
     # Extra operations ensure that Load next block B works correctly
     if REG_BLOCK_TRANS_FLAG and LOOP_ID == LAST_K_ID and (not COLS == VEC_REG_B_LEN):
       vector_scroll_B = [i for i in range(VEC_REG_B_LEN)]
       ptr_B_POS = 0
       for j in range(VEC_REG_B_LEN):
-        code_str += f"    \"ldr     q{vector_id_array_B[vector_scroll_B[j]]}, [x{register_scroll_B[B_odd_flag]}, #{(ptr_B_POS)*16}]             \\n\"\n"
+        code_str += f"    \"ldr     q{vector_id_array_B[vector_scroll_B[j]]}, [x{register_scroll_B[B_odd_flag]}, #{(ptr_B_POS)*(SIMD_LANE * DATA_BYTE)}]             \\n\"\n"
         if ptr_B_POS == COLS - 1:
           ptr_B_POS = 0
-          code_str += f"    \"add     x{register_scroll_B[B_odd_flag]}, x{register_scroll_B[B_odd_flag]}, x8              \\n\"\n"
+          code_str += f"    \"add     x{register_scroll_B[B_odd_flag]}, x{register_scroll_B[B_odd_flag]}, %[ldb]              \\n\"\n"
           B_odd_flag ^= 1
         else:
           ptr_B_POS += 1 
@@ -185,10 +191,10 @@ def UNROLL_LOOP_ID(K, UNROLL_K):
   BEGIN_LOOP = 1
   assert (BEGIN_LOOP == 1)
   EDGE_BEGIN_LOOP = 1
-  if K % UNROLL_K > SIMD_LANE :
-    EDGE_BEGIN_LOOP = (K % UNROLL_K) - (K % SIMD_LANE)
-  elif K % UNROLL_K == 0 and UNROLL_K > SIMD_LANE :
-    EDGE_BEGIN_LOOP = UNROLL_K - SIMD_LANE
+  if K % UNROLL_K > CONST_UNROLL_LANE :
+    EDGE_BEGIN_LOOP = (K % UNROLL_K) - (K % CONST_UNROLL_LANE)
+  elif K % UNROLL_K == 0 and UNROLL_K > CONST_UNROLL_LANE :
+    EDGE_BEGIN_LOOP = UNROLL_K - CONST_UNROLL_LANE
   return BEGIN_LOOP, EDGE_BEGIN_LOOP
 
 def compile_time_for_init_func_asm(LINES, COLS, K, UNROLL_K, real_lines, real_cols, vector_id_array_A, VEC_REG_A_LEN, vector_id_array_B, VEC_REG_B_LEN, register_scroll_B, with_bias):
@@ -222,11 +228,11 @@ def compile_time_for_loop_k_begin_func_asm(LINES, COLS, K, UNROLL_K, real_lines,
     while(tmp_LINES != 0):
       if (tmp_LINES % 2 != 0):
         if cnt == 0:
-          code_str += f"    \"add     x10, x10, x6               \\n\"\n"
-          code_str += f"    \"add     x13, x13, x9               \\n\"\n"
+          code_str += f"    \"add     x21, x21, %[lda]               \\n\"\n"
+          code_str += f"    \"add     x24, x24, %[ldc]               \\n\"\n"
         else:
-          code_str += f"    \"add     x10, x10, x6, lsl #{cnt}               \\n\"\n"
-          code_str += f"    \"add     x13, x13, x9, lsl #{cnt}               \\n\"\n"
+          code_str += f"    \"add     x21, x21, %[lda], lsl #{cnt}               \\n\"\n"
+          code_str += f"    \"add     x24, x24, %[ldc], lsl #{cnt}               \\n\"\n"
       tmp_LINES = tmp_LINES // 2
       cnt += 1
 
@@ -360,10 +366,10 @@ def m_dim_func_asm(MR_MAIN, MR_MAIN_LOOPS, MR_REMAIN, MR_REMAIN_LOOPS, NR, K, UN
 
     if MR_MAIN_LOOPS : # Enter the M-dim main operation
       if MR_MAIN_LOOPS > 1 : # Cyclic M-dim main operation
-        code_str += f"    \"mov     x14, #{MR_MAIN_LOOPS}                   \\n\"\n"
+        code_str += f"    \"mov     x26, #{MR_MAIN_LOOPS}                   \\n\"\n"
         code_str += f"    \"b       1f                                 \\n\"\n"
         code_str += f"  \"2:                                 \\n\"\n"
-        code_str += f"    \"subs    x14, x14, #1                            \\n\"\n"
+        code_str += f"    \"subs    x26, x26, #1                            \\n\"\n"
         code_str += compile_time_for_loop_k_remain_func_asm(MR_MAIN, NR, K, UNROLL_K, MR_MAIN, real_cols, vector_id_array_A, VEC_REG_A_LEN, vector_id_array_B, VEC_REG_B_LEN, register_scroll_B)
         code_str += f"    \"beq     3f              \\n\"\n"
         code_str += compile_time_for_m_dim_micro_kernel_pipeline_func_asm(MR_MAIN, NR, K, UNROLL_K, MR_MAIN, real_cols, MR_MAIN, real_cols, vector_id_array_A, VEC_REG_A_LEN, vector_id_array_B, VEC_REG_B_LEN, register_scroll_B, with_bias)
@@ -371,8 +377,8 @@ def m_dim_func_asm(MR_MAIN, MR_MAIN_LOOPS, MR_REMAIN, MR_REMAIN_LOOPS, NR, K, UN
 
       # K-dim main operation
       if Main_K_loop_flag : 
-        code_str += f"    \"mov     x15, #{Main_K_loop_times}                   \\n\"\n"
-        code_str += f"    \"subs    x15, x15, #1                            \\n\"\n"
+        code_str += f"    \"mov     x27, #{Main_K_loop_times}                   \\n\"\n"
+        code_str += f"    \"subs    x27, x27, #1                            \\n\"\n"
         code_str += compile_time_for_loop_k_begin_func_asm(MR_MAIN, NR, K, UNROLL_K, MR_MAIN, real_cols, vector_id_array_A, VEC_REG_A_LEN, vector_id_array_B, VEC_REG_B_LEN, register_scroll_B, with_bias)
         code_str += f"    \"b       4f                                 \\n\"\n"
         code_str += f"  \"5:                                 \\n\"\n"
@@ -382,7 +388,7 @@ def m_dim_func_asm(MR_MAIN, MR_MAIN_LOOPS, MR_REMAIN, MR_REMAIN_LOOPS, NR, K, UN
           code_str += f"    \"beq     2b                       \\n\"\n"
         else:
           code_str += f"    \"beq     3f                       \\n\"\n"
-        code_str += f"    \"subs    x15, x15, #1                            \\n\"\n"
+        code_str += f"    \"subs    x27, x27, #1                            \\n\"\n"
         code_str += f"    \"b       5b                                 \\n\"\n"
       else:
         code_str += compile_time_for_loop_k_begin_func_asm(MR_MAIN, NR, K, UNROLL_K, MR_MAIN, real_cols, vector_id_array_A, VEC_REG_A_LEN, vector_id_array_B, VEC_REG_B_LEN, register_scroll_B, with_bias)
@@ -399,10 +405,10 @@ def m_dim_func_asm(MR_MAIN, MR_MAIN_LOOPS, MR_REMAIN, MR_REMAIN_LOOPS, NR, K, UN
       if MR_MAIN_LOOPS : # Cyclic M-dim remain operation
         code_str += compile_time_for_m_dim_micro_kernel_pipeline_func_asm(MR_MAIN, NR, K, UNROLL_K, MR_MAIN, real_cols, MR_REMAIN, real_cols, vector_id_array_A, VEC_REG_A_LEN, vector_id_array_B, VEC_REG_B_LEN, register_scroll_B, with_bias)
       if MR_REMAIN_LOOPS > 1 :
-        code_str += f"    \"mov     x14, #{MR_REMAIN_LOOPS}                   \\n\"\n"
+        code_str += f"    \"mov     x26, #{MR_REMAIN_LOOPS}                   \\n\"\n"
         code_str += f"    \"b       1f                                 \\n\"\n"
         code_str += f"  \"2:                                 \\n\"\n"
-        code_str += f"    \"subs    x14, x14, #1                            \\n\"\n"
+        code_str += f"    \"subs    x26, x26, #1                            \\n\"\n"
         code_str += compile_time_for_loop_k_remain_func_asm(MR_MAIN, NR, K, UNROLL_K, MR_REMAIN, real_cols, vector_id_array_A, VEC_REG_A_LEN, vector_id_array_B, VEC_REG_B_LEN, register_scroll_B)
         code_str += f"    \"beq     3f              \\n\"\n"
         code_str += compile_time_for_m_dim_micro_kernel_pipeline_func_asm(MR_MAIN, NR, K, UNROLL_K, MR_REMAIN, real_cols, MR_REMAIN, real_cols, vector_id_array_A, VEC_REG_A_LEN, vector_id_array_B, VEC_REG_B_LEN, register_scroll_B, with_bias)
@@ -410,8 +416,8 @@ def m_dim_func_asm(MR_MAIN, MR_MAIN_LOOPS, MR_REMAIN, MR_REMAIN_LOOPS, NR, K, UN
 
       # K-dim main operation
       if Main_K_loop_flag : 
-        code_str += f"    \"mov     x15, #{Main_K_loop_times}                   \\n\"\n"
-        code_str += f"    \"subs    x15, x15, #1                            \\n\"\n"
+        code_str += f"    \"mov     x27, #{Main_K_loop_times}                   \\n\"\n"
+        code_str += f"    \"subs    x27, x27, #1                            \\n\"\n"
         code_str += compile_time_for_loop_k_begin_func_asm(MR_MAIN, NR, K, UNROLL_K, MR_REMAIN, real_cols, vector_id_array_A, VEC_REG_A_LEN, vector_id_array_B, VEC_REG_B_LEN, register_scroll_B, with_bias)
         code_str += f"    \"b       4f                                 \\n\"\n"
         code_str += f"  \"5:                                 \\n\"\n"
@@ -421,7 +427,7 @@ def m_dim_func_asm(MR_MAIN, MR_MAIN_LOOPS, MR_REMAIN, MR_REMAIN_LOOPS, NR, K, UN
           code_str += f"    \"beq     2b                       \\n\"\n"
         else:
           code_str += f"    \"beq     3f                       \\n\"\n"
-        code_str += f"    \"subs    x15, x15, #1                            \\n\"\n"
+        code_str += f"    \"subs    x27, x27, #1                            \\n\"\n"
         code_str += f"    \"b       5b                                 \\n\"\n"
       else:
         code_str += compile_time_for_loop_k_begin_func_asm(MR_MAIN, NR, K, UNROLL_K, MR_REMAIN, real_cols, vector_id_array_A, VEC_REG_A_LEN, vector_id_array_B, VEC_REG_B_LEN, register_scroll_B, with_bias)
@@ -438,26 +444,27 @@ def m_dim_func_asm(MR_MAIN, MR_MAIN_LOOPS, MR_REMAIN, MR_REMAIN_LOOPS, NR, K, UN
 
 def n_dim_func_asm(REMAIN_N, K, UNROLL_K, NR, NR_LOOPS, MR_MAIN, MR_MAIN_LOOPS, MR_REMAIN, MR_REMAIN_LOOPS, with_bias) :
 
-    VEC_REG_B_LEN = NR if K < 8 else max(4, NR)
+    VEC_REG_B_LEN = NR if K <= 16 else max(4, NR)
     if NR == 6 :
-      VEC_REG_B_LEN = NR if K < 16 else 8
+      VEC_REG_B_LEN = NR if K <= 32 else 8
     
-    vector_id_array_B = []
-    for i in range(MR_MAIN*NR, MR_MAIN*NR+VEC_REG_B_LEN):
-      vector_id_array_B.append(i)
+    VEC_REG_A_LEN = MR_MAIN if K <= 16 else min(32 - MR_MAIN*NR - VEC_REG_B_LEN, min(2*MR_MAIN, 8))
 
     vector_id_array_A = []
-    for i in range(MR_MAIN*NR+VEC_REG_B_LEN, min(32, MR_MAIN*NR+VEC_REG_B_LEN+2*MR_MAIN)):
+    for i in range(0, VEC_REG_A_LEN):
       vector_id_array_A.append(i)
-    VEC_REG_A_LEN = len(vector_id_array_A)
+    
+    vector_id_array_B = []
+    for i in range(VEC_REG_A_LEN, VEC_REG_A_LEN+VEC_REG_B_LEN):
+      vector_id_array_B.append(i)
 
-    register_scroll_B = [11, 12]
+    register_scroll_B = [22, 23]
 
-    Main_N_flag = (NR_LOOPS > 1) or (SIMD_LANE * NR == REMAIN_N)
     Edge_N_flag = SIMD_LANE * NR * NR_LOOPS > REMAIN_N
     Edge_N = REMAIN_N % (SIMD_LANE * NR)
-    if Edge_N_flag :
+    if Edge_N_flag : 
       NR_LOOPS -= 1
+    Main_N_flag = 0 if NR_LOOPS == 0 else 1
     
     lines_branch_1 = MR_MAIN if MR_MAIN_LOOPS else MR_REMAIN
     lines_branch_2 = MR_MAIN if not MR_REMAIN_LOOPS else MR_REMAIN
@@ -469,10 +476,10 @@ def n_dim_func_asm(REMAIN_N, K, UNROLL_K, NR, NR_LOOPS, MR_MAIN, MR_MAIN_LOOPS, 
 
     if Main_N_flag : # Enter the N-dim main operation
       if NR_LOOPS > 1 : # Cyclic N-dim main operation
-        code_str += f"    \"mov     x7, #{NR_LOOPS}                   \\n\"\n"
+        code_str += f"    \"mov     x25, #{NR_LOOPS}                   \\n\"\n"
         code_str += f"    \"b       6f                                 \\n\"\n"
         code_str += f"  \"0:                                 \\n\"\n"
-        code_str += f"    \"subs    x7, x7, #1                            \\n\"\n"
+        code_str += f"    \"subs    x25, x25, #1                            \\n\"\n"
         code_str += f"    \"beq     7f                       \\n\"\n" 
         code_str += compile_time_for_n_dim_micro_kernel_pipeline_func_asm(MR_MAIN, NR, K, UNROLL_K, lines_branch_2, SIMD_LANE*NR, lines_branch_1, SIMD_LANE*NR, vector_id_array_A, VEC_REG_A_LEN, vector_id_array_B, VEC_REG_B_LEN, register_scroll_B, with_bias)
         code_str += f"  \"6:                                 \\n\"\n"
@@ -588,7 +595,8 @@ def RBSA(M, N, NR_MAIN):
 
 def laf_asm_code(M, N, K, lda, ldb, ldc, UNROLL_K = 8, NR_MAIN = 4, with_bias = 0):
 
-    assert (UNROLL_K % (2*SIMD_LANE) == 0)
+    assert (UNROLL_K % (2*CONST_UNROLL_LANE) == 0)
+    assert (UNROLL_K >= 4)
     assert (NR_MAIN == 3 or NR_MAIN == 4 or NR_MAIN == 5)
 
     NR_MAIN_LOOPS, NR_REMAIN, NR_REMAIN_LOOPS, NR_MAIN_MR_MAIN, NR_MAIN_MR_MAIN_LOOPS, NR_MAIN_MR_REMAIN, NR_MAIN_MR_REMAIN_LOOPS, NR_REMAIN_MR_MAIN, NR_REMAIN_MR_MAIN_LOOPS, NR_REMAIN_MR_REMAIN, NR_REMAIN_MR_REMAIN_LOOPS = RBSA(M, N, NR_MAIN)
@@ -598,11 +606,11 @@ def laf_asm_code(M, N, K, lda, ldb, ldc, UNROLL_K = 8, NR_MAIN = 4, with_bias = 
   asm volatile(
     "prfm    PLDL1KEEP, [%[A], #64]              \\n"
     "prfm    PLDL1KEEP, [%[B], #64]              \\n"
-    "lsl	   x6, %[lda], #2              \\n"
-    "lsl	   x8, %[ldb], #3              \\n"
-    "lsl	   x9, %[ldc], #2              \\n"
-    "mov     x10, %[A]                 \\n"
-    "mov     x13, %[C]                 \\n"
+    "lsl	   %[lda], %[lda], #2              \\n"
+    "lsl	   %[ldb], %[ldb], #3              \\n"
+    "lsl	   %[ldc], %[ldc], #2              \\n"
+    "mov     x21, %[A]                 \\n"
+    "mov     x24, %[C]                 \\n"
 """
 
     if NR_MAIN_LOOPS :
@@ -610,29 +618,31 @@ def laf_asm_code(M, N, K, lda, ldb, ldc, UNROLL_K = 8, NR_MAIN = 4, with_bias = 
 
     if NR_REMAIN_LOOPS :
       if NR_MAIN_LOOPS:
-        code_str += f"    \"mov     x10, %[A]                 \\n\"\n"
-        code_str += f"    \"add     %[B], %[B], #{SIMD_LANE * NR_MAIN * 4}                 \\n\"\n"
-        code_str += f"    \"add     %[C], %[C], #{SIMD_LANE * NR_MAIN * 4}                 \\n\"\n"
-        code_str += f"    \"mov     x13, %[C]                 \\n\"\n"
+        code_str += f"    \"mov     x21, %[A]                 \\n\"\n"
+        code_str += f"    \"add     %[B], %[B], #{NR_MAIN * SIMD_LANE * 4}                 \\n\"\n"
+        code_str += f"    \"add     %[C], %[C], #{NR_MAIN * SIMD_LANE * 4}                 \\n\"\n"
+        code_str += f"    \"mov     x24, %[C]                 \\n\"\n"
       code_str += n_dim_func_asm(N - SIMD_LANE * NR_MAIN * NR_MAIN_LOOPS, K, UNROLL_K, NR_REMAIN, NR_REMAIN_LOOPS, NR_REMAIN_MR_MAIN, NR_REMAIN_MR_MAIN_LOOPS, NR_REMAIN_MR_REMAIN, NR_REMAIN_MR_REMAIN_LOOPS, with_bias)
 
     code_str += f"""
     : [A]"=r"(A),
       [B]"=r"(B),
-      [C]"=r"(C)
+      [C]"=r"(C),
+      [lda]"=r"(lda),
+      [ldb]"=r"(ldb),
+      [ldc]"=r"(ldc)
     : "0"(A),
       "1"(B),
       "2"(C),
-      [lda]"r"(lda),
-      [ldb]"r"(ldb),
-      [ldc]"r"(ldc)
+      "3"(lda),
+      "4"(ldb),
+      "5"(ldc)
     : "cc", "memory" """
-    for line in range(RESERVED_REG_NUM - 6 + 2 * max(NR_MAIN_MR_MAIN, NR_REMAIN_MR_MAIN)):
-      code_str += f", \"x{6 + line}\""
-      # if 6 + line < 18 : # x18 register preserved in M2
-      #   code_str += f", \"x{6 + line}\""
-      # else :
-      #   code_str += f", \"x{7 + line}\""
+    for i in range(6, 29):
+      if i == 18 :
+        continue
+      else :
+        code_str += f", \"x{i}\""
     code_str += f"\n                      "
     for i in range(32):
       code_str += f", \"v{i}\""
@@ -651,32 +661,31 @@ def xsmm_asm_armv8_code(M, K, N, lda, ldb, ldc, UNROLL_K, NR_MAIN, uniq_id):
 #include <cmath>
 #include <cstring>
 #include <cassert>
-#include <arm_neon.h>
 #include <cstdlib>
 #include <cstdio>
 
 namespace laf {{
-void small_gemm(const float *A, const float *B, float *C, const int lda, const int ldb, const int ldc) {{
+void small_gemm(const float *A, const float *B, float *C, int lda, int ldb, int ldc) {{
 """
     cc_code += laf_asm_code(M, N, K, lda, ldb, ldc, UNROLL_K, NR_MAIN, with_bias = 0)
     cc_code += f"""
 }}
-void small_gemm_with_bias(const float *A, const float *B, float *C, const int lda, const int ldb, const int ldc) {{
+void small_gemm_with_bias(const float *A, const float *B, float *C, int lda, int ldb, int ldc) {{
 """
     cc_code += laf_asm_code(M, N, K, lda, ldb, ldc, UNROLL_K, NR_MAIN, with_bias = 1)
     cc_code += f"""
 }}
 }}
 
-extern "C" int gemm_{M}x{K}x{N}_{lda}_{ldb}_{ldc}_xsmm_{uniq_id}(const float *A, const float *B, float *C, const int lda, const int ldb, const int ldc){{
+extern "C" int gemm_{M}x{K}x{N}_{lda}_{ldb}_{ldc}_xsmm_{uniq_id}(const float *A, const float *B, float *C, int lda, int ldb, int ldc){{
   laf::small_gemm(A, B, C, lda, ldb, ldc);
   return 0;
 }}
 
-extern "C" int gemm_{M}x{K}x{N}_{lda}_{ldb}_{ldc}_xsmm_with_bias_{uniq_id}(const float *A, const float *B, float *C, const int lda, const int ldb, const int ldc){{
+extern "C" int gemm_{M}x{K}x{N}_{lda}_{ldb}_{ldc}_xsmm_with_bias_{uniq_id}(const float *A, const float *B, float *C, int lda, int ldb, int ldc){{
   laf::small_gemm_with_bias(A, B, C, lda, ldb, ldc);
   return 0;
 }}
-
+ 
 """
     return cc_code

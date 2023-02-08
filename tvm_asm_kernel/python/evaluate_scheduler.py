@@ -17,30 +17,19 @@ from utils_func.evaluate import evaluate
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
-    parser.add_argument("--MNK_file", type=str, required=True)
-    parser.add_argument("--scheduler_log", type=str, required=True)
+    parser.add_argument("-m", type=int, required=True, help="M")
+    parser.add_argument("-k", type=int, required=True, help="K")
+    parser.add_argument("-n", type=int, required=True, help="N")
     parser.add_argument("--parallel", action="store_true", help='whether parallel execute')
-    parser.add_argument("--offline", action="store_true", help='whether to use offline PackB')
+    parser.add_argument("--scheduler_log", type=str, required=True)
     args = parser.parse_args()
 
-    M=[]
-    N=[]
-    K=[]
-    best_schedule_file = args.scheduler_log
-    with open(args.MNK_file, "r") as f:
-        for line in f:
-            MNK = line.strip().split(" ")
-            MNK = [int(x) for x in MNK]
-            M.append(MNK[0])
-            N.append(MNK[1])
-            K.append(MNK[2])
-
-    mod_list = []
-    
-    offline_pack = args.offline
+    M = args.m
+    K = args.k
+    N = args.n
     parallel = args.parallel
+    best_schedule_file = args.scheduler_log
 
     from config.mac_config import target
-    for i in range(len(M)):
-        # print('%d, %d, %d' % (M[i], N[i], K[i]))
-        evaluate(M[i], K[i], N[i], best_schedule_file, offline_pack, parallel, target=target)
+    # print('%d, %d, %d' % (M, N, K))
+    evaluate(M, K, N, best_schedule_file, parallel, pack_dso=False,target=target)

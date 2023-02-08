@@ -6,6 +6,16 @@ PROJECT_ROOT=`cd $tmp/..; pwd`
 cd ${PROJECT_ROOT}
 
 tune_num=$1
+threads=$2
+
+if [ "${threads}" == "1" ]; then
+    parallel=""
+elif [ "${threads}" -gt "1" ]; then
+    parallel="--parallel"
+else
+    echo "threads num error"
+    exit -1
+fi
 
 M=(64    64   64   256  64   128 128  512 512 128 512 256 256  1024 1024 256  512  512  2048 2048 512)
 N=(12544 3136 3136 3136 3136 784 784  784 784 784 784 196 196  196  196  196  49   49   49   49   49)
@@ -21,7 +31,7 @@ do
 	echo ${M[$i]} ${N[$i]} ${K[$i]} >> MNK.txt
 done
 
-bash ./scripts/tune.sh $tune_num
+bash ./scripts/tune.sh $tune_num $threads
 
 if [[ -f "tune_output/tune.over" ]]; then
 	if [[ -f "scheduler_house/resnet50" ]]; then

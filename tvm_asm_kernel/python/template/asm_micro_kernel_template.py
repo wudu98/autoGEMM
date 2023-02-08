@@ -8,7 +8,7 @@ from template.gen_asm_code.tvm_extern_asm_micro_kernel import intrin_gemm_MxKxN,
 dtype = "float32"
 
 @autotvm.template("matmul")
-def matmul(M, K, N, offline_pack, parallel):
+def matmul(M, K, N, parallel):
     cfg = autotvm.get_config()
 
     # Tiling structure: split M/N/K into 3 axes each.
@@ -33,16 +33,7 @@ def matmul(M, K, N, offline_pack, parallel):
     kn = cfg['tile_k'].size[-1]
     bn_ceil = ((bn - 1) // padding_size + 1) * padding_size
 
-    if offline_pack :
-        PackedB = te.placeholder((K // kn, N // bn, kn, bn_ceil), name='PackedB')
-    else :
-        B = te.placeholder((K, N), name="B")
-        PackedB = te.compute(
-            (K // kn, N // bn, kn, bn_ceil), 
-            lambda i, x, y, z: te.if_then_else(
-                z < bn, B[i * kn + y, x * bn + z], 0
-            ), name="PackedB"
-        )
+    PackedB = te.placeholder((K // kn, N // bn, kn, bn_ceil), name='PackedB')
 
     k = te.reduce_axis((0, K), "k")
 
@@ -107,7 +98,4 @@ def matmul(M, K, N, offline_pack, parallel):
                                 uniq_id
                                 ))
 
-    if offline_pack :
-        return s, [A, PackedB, C]
-    else :
-        return s, [A, B, C]
+    return s, [A, PackedB, C]

@@ -22,7 +22,6 @@ if __name__ == "__main__":
     parser.add_argument("-k", type=int, required=True, help="K")
     parser.add_argument("-n", type=int, required=True, help="N")
     parser.add_argument("--parallel", action="store_true", help='whether parallel execute')
-    parser.add_argument("--offline", action="store_true", help='whether to use offline PackB')
     parser.add_argument(
         "-s",
         "--step",
@@ -47,9 +46,8 @@ if __name__ == "__main__":
 
     record_file = args.record_file
     step = args.step
-    offline_pack = args.offline
     parallel = args.parallel
 
     from config.mac_config import target
-    tune(M, K, N, record_file, offline_pack, parallel, n_trial=step, target=target)
-    evaluate(M, K, N, record_file, offline_pack, parallel, target=target)
+    tune(M, K, N, record_file, parallel, n_trial=step, target=target)
+    evaluate(M, K, N, record_file, parallel, pack_dso=True, target=target)

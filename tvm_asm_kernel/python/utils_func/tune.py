@@ -11,7 +11,6 @@ def tune(
     K,
     N,
     record_file,
-    offline_pack, 
     parallel, 
     n_trial=2500,
     early_stopping=1000,
@@ -25,7 +24,7 @@ def tune(
         os.remove(record_file)
 
     task = autotvm.task.create(
-        "matmul", args=[M, K, N, offline_pack, parallel], target=target
+        "matmul", args=[M, K, N, parallel], target=target
     )
     print(task.config_space)
 

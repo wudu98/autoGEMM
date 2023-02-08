@@ -130,6 +130,8 @@ dmypy.json
 .pyre/
 
 .DS_Store
+.pkl_memoize_py3
 scheduler_house/
 c_file_asm.cpp
 benchmark_kernel
+kernel_params_list.hpp

@@ -658,11 +658,6 @@ def xsmm_asm_armv8_code(M, K, N, lda, ldb, ldc, UNROLL_K, NR_MAIN, uniq_id):
 #ifndef __SGEMM_KERNEL_H
 #define __SGEMM_KERNEL_H
 #endif
-#include <cmath>
-#include <cstring>
-#include <cassert>
-#include <cstdlib>
-#include <cstdio>
 
 namespace laf {{
 void small_gemm(const float *A, const float *B, float *C, int lda, int ldb, int ldc) {{

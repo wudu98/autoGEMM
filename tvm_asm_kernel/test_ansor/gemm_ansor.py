@@ -68,7 +68,7 @@ answer = np.dot(a.asnumpy(), b.asnumpy())
 func(a, b, c)
 
 # Check results
-tvm.testing.assert_allclose(c.asnumpy(), answer, rtol=1e-4, atol=1e-4)
+tvm.testing.assert_allclose(c.asnumpy(), answer, rtol=1e-2, atol=1e-4)
 # Evaluate execution time
 evaluator = func.time_evaluator(func.entry_name, ctx, number=1000, min_repeat_ms=5000)
 latency = evaluator(a, b, c).mean

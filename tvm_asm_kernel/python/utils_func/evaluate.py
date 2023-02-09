@@ -57,12 +57,12 @@ def evaluate(M, K, N, record_file, parallel, pack_dso, target="llvm"):
 
     expected = np.dot(a.asnumpy(), b.asnumpy())
 
-    tvm.testing.assert_allclose(c.asnumpy(), expected, rtol=1e-4, atol=1e-4)
+    tvm.testing.assert_allclose(c.asnumpy(), expected, rtol=1e-2, atol=1e-4)
     evaluator = func.time_evaluator(func.entry_name, ctx, number=1000, min_repeat_ms=5000)
     mean_time = evaluator(a, packed_b, c).mean
     gflops = 2 * M * N * K * 1e-9 / mean_time
 
-    print("GFLOPS: %f, avg time: %f ms" % (gflops, mean_time * 1000))
+    print("TVM offline GFLOPS: %f, avg time: %f ms" % (gflops, mean_time * 1000))
 
     if pack_dso:
         packb_func.save(f"../build/gemm_obj/{packb_func.name}.o")

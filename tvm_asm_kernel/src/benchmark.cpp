@@ -131,7 +131,7 @@ int main(int argc, char* argv[]) {
     pack_func(tvm_B, tvm_packedB);
     func(tvm_A, tvm_packedB, tvm_C);
     if (!test_utils::is_same_matrix(refC, ourC, M, N, ldc, 1e-5, 1e-5)) {
-      int idx = test_utils::diff_index(refC, ourC, M, N, ldc, , 1e-5, 1e-5);
+      int idx = test_utils::diff_index(refC, ourC, M, N, ldc, 1e-5, 1e-5);
       printf("ERROR: M=%d, N=%d, K=%d, lda=%d, ldb=%d, ldc=%d, ACC=%d, ref[%d]=%.6f, our[%d]=%.6f\n",
             M, N, K, lda, ldb, ldc, ACC, idx, refC[idx], idx, ourC[idx]);
     } else {

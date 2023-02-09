@@ -23,7 +23,7 @@ public:
   static bool is_same_matrix(const float *C1, const float *C2, int M, int N, int ldc, float rtol, float atol) {
     for (int i = 0; i < M; ++i) {
       for (int j = 0; j < N; ++j) {
-        if ((fabs(C1[i * ldc + j] - C2[i * ldc + j]) > rtol) && (fabs(C1[i * ldc + j] - C2[i * ldc + j])/fabs(C1[i * ldc + j]) > atol)) {
+        if ((fabs(C1[i * ldc + j] - C2[i * ldc + j]) > atol) && (fabs(C1[i * ldc + j] - C2[i * ldc + j])/fabs(C1[i * ldc + j]) > rtol)) {
           return false;
         }
       }
@@ -34,7 +34,7 @@ public:
   static int diff_index(const float *C1, const float *C2, int M, int N, int ldc, float rtol, float atol) {
     for (int i = 0; i < M; ++i) {
       for (int j = 0; j < N; ++j) {
-        if ((fabs(C1[i * ldc + j] - C2[i * ldc + j]) > rtol) && (fabs(C1[i * ldc + j] - C2[i * ldc + j])/fabs(C1[i * ldc + j]) > atol)) {
+        if ((fabs(C1[i * ldc + j] - C2[i * ldc + j]) > atol) && (fabs(C1[i * ldc + j] - C2[i * ldc + j])/fabs(C1[i * ldc + j]) > rtol)) {
           return i * ldc + j;
         }
       }

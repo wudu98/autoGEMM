@@ -9,8 +9,10 @@ export PYTHONPATH=$PYTHONPATH:$PWD/python
 export TVM_CC=clang++
 
 tune_output_path="tune_output"
-tune_num=$1
+
+arch=$1
 threads=$2
+tune_num=$3
 
 if [ "${threads}" == "1" ]; then
     parallel=""
@@ -29,8 +31,6 @@ fi
 mkdir -p $tune_output_path
 mkdir -p $tune_output_path/perf
 mkdir -p $tune_output_path/log
-mkdir -p $tune_output_path/gemm_obj
-mkdir -p $tune_output_path/library
 
 touch $tune_output_path/scheduler_summary.log
 
@@ -41,7 +41,7 @@ do
     M=`echo $line | awk '{print $1}'`
     N=`echo $line | awk '{print $2}'`
     K=`echo $line | awk '{print $3}'`
-    python ${PROJECT_ROOT}/python/tune_scheduler.py -m ${M} -n ${N} -k ${K} -s ${tune_num} ${parallel} -r $tune_output_path/matmul.log > $tune_output_path/perf/${cnt}_matmul_${M}_${N}_${K}.perf
+    python ${PROJECT_ROOT}/python/tune_scheduler.py -m ${M} -n ${N} -k ${K} -a ${arch} ${parallel} -s ${tune_num} -r $tune_output_path/matmul.log > $tune_output_path/perf/${cnt}_matmul_${M}_${N}_${K}.perf
     cp $tune_output_path/matmul.log.tmp $tune_output_path/log/${cnt}_matmul_${M}_${N}_${K}.log
     python ${PROJECT_ROOT}/python/summarize_scheduler.py --input $tune_output_path/matmul.log --output $tune_output_path/scheduler_summary.log
     let cnt+=1

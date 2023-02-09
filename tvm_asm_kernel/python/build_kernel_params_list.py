@@ -5,7 +5,7 @@ import json
 def main():
     script_dir = os.path.dirname(os.path.abspath(__file__))
     project_dir = os.path.abspath(os.path.join(script_dir, ".."))
-    input_file_path = os.path.join(project_dir, f"tune_output/scheduler_summary.log")
+    input_file_path = os.path.join(project_dir, f"build/scheduler_summary.log")
     # input_file_path = os.path.join(project_dir, "./cache_block_size.json")
     output_file_path = os.path.join(project_dir, "src/kernel_params_list.hpp")
 

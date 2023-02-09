@@ -64,7 +64,7 @@ int main(int argc, char* argv[]) {
     string func_name = "OP_" + base_name;
     string pack_func_name = func_name + "_packB";
 
-    tvm::runtime::Module mod_tvmlib = tvm::runtime::Module::LoadFromFile("../tune_output/library/" + mod_name);
+    tvm::runtime::Module mod_tvmlib = tvm::runtime::Module::LoadFromFile("../build/library/" + mod_name);
     // tvm::runtime::Module mod_tvmlib = (*tvm::runtime::Registry::Get("runtime.SystemLib"))();
 
     tvm::runtime::PackedFunc pack_func = mod_tvmlib.GetFunction(pack_func_name);

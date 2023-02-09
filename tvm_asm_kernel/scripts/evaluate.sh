@@ -11,8 +11,9 @@ export TVM_CC=clang++
 build_output_path="build"
 tune_output_path="tune_output"
 
-repeats=$1
+arch=$1
 threads=$2
+repeats=$3
 
 if [ "${threads}" == "1" ]; then
     parallel=""
@@ -29,6 +30,8 @@ if [[ -d $build_output_path ]]; then
     rm -rf $build_output_path
 fi
 mkdir -p $build_output_path
+mkdir -p $build_output_path/gemm_obj
+mkdir -p $build_output_path/library
 
 MNK_file=${PROJECT_ROOT}/MNK.txt 
 scheduler_log=${tune_output_path}/scheduler_summary.log
@@ -48,7 +51,7 @@ do
     M=`echo $line | awk '{print $1}'`
     N=`echo $line | awk '{print $2}'`
     K=`echo $line | awk '{print $3}'`
-    python ${PROJECT_ROOT}/python/evaluate_scheduler.py -m ${M} -n ${N} -k ${K} ${parallel} --scheduler_log ${PROJECT_ROOT}/${scheduler_log_output}
+    python ${PROJECT_ROOT}/python/evaluate_scheduler.py -m ${M} -n ${N} -k ${K} -a ${arch} ${parallel} --scheduler_log ${PROJECT_ROOT}/${scheduler_log_output}
     ./benchmark_kernel ${M} ${N} ${K} ${repeats}
     let cnt+=1
 done

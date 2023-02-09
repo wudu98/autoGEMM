@@ -21,6 +21,7 @@ if __name__ == "__main__":
     parser.add_argument("-m", type=int, required=True, help="M")
     parser.add_argument("-k", type=int, required=True, help="K")
     parser.add_argument("-n", type=int, required=True, help="N")
+    parser.add_argument("-a", "--arch", default="mac", choices=["mac", "linux"], help='select architecture mac or linux')
     parser.add_argument("--parallel", action="store_true", help='whether parallel execute')
     parser.add_argument(
         "-s",
@@ -48,6 +49,10 @@ if __name__ == "__main__":
     step = args.step
     parallel = args.parallel
 
-    from config.mac_config import target
+    if args.arch == "mac" :
+        from config.mac_config import target
+    elif args.arch == "linux" :
+        from config.linux_config import target
+        
     tune(M, K, N, record_file, parallel, n_trial=step, target=target)
-    evaluate(M, K, N, record_file, parallel, pack_dso=True, target=target)
+    evaluate(M, K, N, record_file, parallel, pack_dso=False, target=target)

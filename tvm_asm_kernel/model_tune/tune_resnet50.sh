@@ -5,8 +5,9 @@ tmp=`dirname $0`
 PROJECT_ROOT=`cd $tmp/..; pwd`
 cd ${PROJECT_ROOT}
 
-tune_num=$1
+arch=$1
 threads=$2
+tune_num=$3
 
 if [ "${threads}" == "1" ]; then
     parallel=""
@@ -16,6 +17,8 @@ else
     echo "threads num error"
     exit -1
 fi
+
+export OMP_NUM_THREADS=${threads}
 
 M=(64    64   64   256  64   128 128  512 512 128 512 256 256  1024 1024 256  512  512  2048 2048 512)
 N=(12544 3136 3136 3136 3136 784 784  784 784 784 784 196 196  196  196  196  49   49   49   49   49)
@@ -31,7 +34,7 @@ do
 	echo ${M[$i]} ${N[$i]} ${K[$i]} >> MNK.txt
 done
 
-bash ./scripts/tune.sh $tune_num $threads
+bash ./scripts/tune.sh $arch $threads $tune_num 
 
 if [[ -f "tune_output/tune.over" ]]; then
 	if [[ -f "scheduler_house/resnet50" ]]; then

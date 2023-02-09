@@ -50,7 +50,7 @@ def evaluate(M, K, N, record_file, parallel, pack_dso, target="llvm"):
                 parallel_axis = packb_schedule[PackedB].fuse(bigK, bigN)
                 packb_schedule[PackedB].parallel(parallel_axis)
             packb_func = tvm.build(packb_schedule, [B, PackedB], name="OP_GEMM_%dX%dX%d_packB" % (M, N, K), target=target)
-            print(tvm.lower(packb_schedule, [B, PackedB]))
+            # print(tvm.lower(packb_schedule, [B, PackedB]))
 
             packb_func(b, packed_b)
             func(a, packed_b, c)
@@ -58,17 +58,15 @@ def evaluate(M, K, N, record_file, parallel, pack_dso, target="llvm"):
     expected = np.dot(a.asnumpy(), b.asnumpy())
 
     tvm.testing.assert_allclose(c.asnumpy(), expected, rtol=1e-4, atol=1e-4)
-    evaluator = func.time_evaluator(func.entry_name, ctx, number=1000, min_repeat_ms=1000)
+    evaluator = func.time_evaluator(func.entry_name, ctx, number=1000, min_repeat_ms=5000)
     mean_time = evaluator(a, packed_b, c).mean
     gflops = 2 * M * N * K * 1e-9 / mean_time
 
     print("GFLOPS: %f, avg time: %f ms" % (gflops, mean_time * 1000))
 
     if pack_dso:
-        packb_func.save(f"tune_output/gemm_obj/{packb_func.name}.o")
-        func.save(f"tune_output/gemm_obj/{func.name}.o")
-        os.system(f"ar rcs tune_output/library/GEMM_{M}X{N}X{K}_kernel.a tune_output/gemm_obj/OP_GEMM_{M}X{N}X{K}*.o")
+        packb_func.save(f"../build/gemm_obj/{packb_func.name}.o")
+        func.save(f"../build/gemm_obj/{func.name}.o")
+        os.system(f"ar rcs ../build/library/GEMM_{M}X{N}X{K}_kernel.a ../build/gemm_obj/OP_GEMM_{M}X{N}X{K}*.o")
         func.import_module(packb_func)
-        func.export_library(f"tune_output/library/GEMM_{M}X{N}X{K}_kernel.so")
-
-        print(M, N, K, bn, kn, padding_size)
+        func.export_library(f"../build/library/GEMM_{M}X{N}X{K}_kernel.so")

@@ -19,5 +19,6 @@ then
 fi
 
 python python/make_c_file_asm.py $M $N $K $UNROLL $NR $REPEAT
+# python python/make_c_file_asm_sve.py $M $N $K $UNROLL $NR $REPEAT
 make -s
 ./benchmark_kernel

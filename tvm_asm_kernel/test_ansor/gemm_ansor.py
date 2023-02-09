@@ -1,18 +1,35 @@
 import os
 import sys
+import argparse
 import numpy as np
 import tvm
-from tvm import te, auto_scheduler, topi
+from tvm import te, auto_scheduler, topi, testing
 
-M = int(sys.argv[1])
-N = int(sys.argv[2])
-K = int(sys.argv[3])
-use_tune = int(sys.argv[4])
-print('M=%d, N=%d, K=%d' % (M, N, K))
+parser = argparse.ArgumentParser(description="Script to run ansor.")
+parser.add_argument("-m", type=int, required=True, help="M")
+parser.add_argument("-k", type=int, required=True, help="K")
+parser.add_argument("-n", type=int, required=True, help="N")
+parser.add_argument("-a", "--arch", default="mac", choices=["mac", "linux"], help='select architecture mac or linux')
+parser.add_argument("--use_tune", action="store_true", help='whether parallel execute')
+parser.add_argument(
+    "-r",
+    "--record_file",
+    default="matmul.log",
+    type=str,
+    required=False,
+    help="Specify name of the file to record ansor tuning result",
+)
+args = parser.parse_args()
 
+M = args.m
+N = args.n
+K = args.k
 dtype = "float32"
-# target = "llvm -mtriple=aarch64-linux-gnu -mattr=+neon"
-target = "llvm -mtriple=arm64-apple-darwin -mattr=+neon"
+
+if args.arch == "mac" :
+    target = "llvm -mtriple=arm64-apple-darwin -mattr=+neon"
+elif args.arch == "linux" :
+    target = "llvm -mtriple=aarch64-linux-gnu -mattr=+neon"
 
 @auto_scheduler.register_workload
 def gemm_ansor(M, N, K):
@@ -26,15 +43,15 @@ task = auto_scheduler.SearchTask(
     func=gemm_ansor, args=(M, N, K), target=target
 )
 
-log_file = f"./logs/gemm_{M}X{N}X{K}.json"
+log_file = args.record_file
 
 tune_option = auto_scheduler.TuningOptions(
-    num_measure_trials=10000, 
-    runner=auto_scheduler.LocalRunner(number=5, repeat=3, timeout=50, min_repeat_ms=200),#, enable_cpu_cache_flush=True),
+    num_measure_trials=10,#000, 
+    runner=auto_scheduler.LocalRunner(number=100, repeat=1, timeout=300, min_repeat_ms=100),#, enable_cpu_cache_flush=True),
     measure_callbacks=[auto_scheduler.RecordToFile(log_file)],
 )
 
-if use_tune == 1:
+if args.use_tune == 1:
     task.tune(tune_option)
 
 sch, args = task.apply_best(log_file)
@@ -51,8 +68,8 @@ answer = np.dot(a.asnumpy(), b.asnumpy())
 func(a, b, c)
 
 # Check results
-np.testing.assert_allclose(c.asnumpy(), answer, rtol=1e-3)
+tvm.testing.assert_allclose(c.asnumpy(), answer, rtol=1e-4, atol=1e-4)
 # Evaluate execution time
-evaluator = func.time_evaluator(func.entry_name, ctx, number=1000)
+evaluator = func.time_evaluator(func.entry_name, ctx, number=1000, min_repeat_ms=5000)
 latency = evaluator(a, b, c).mean
-print('time: %f ms, GFLOPS: %f' % (latency * 1000, 2 * M * N * K / latency / 1e9))
+print('M=%d, N=%d, K=%d, time: %f ms, GFLOPS: %f' % (M, N, K, latency * 1000, 2 * M * N * K / latency / 1e9))

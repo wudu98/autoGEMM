@@ -135,3 +135,4 @@ scheduler_house/
 c_file_asm.cpp
 benchmark_kernel
 kernel_params_list.hpp
+MNK.txt

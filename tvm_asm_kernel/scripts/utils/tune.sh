@@ -2,7 +2,7 @@
 set -e
 
 tmp=`dirname $0`
-PROJECT_ROOT=`cd $tmp/..; pwd`
+PROJECT_ROOT=`cd $tmp/../..; pwd`
 cd ${PROJECT_ROOT}
 
 export PYTHONPATH=$PYTHONPATH:$PWD/python

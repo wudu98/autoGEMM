@@ -2,7 +2,7 @@
 set -e
 
 tmp=`dirname $0`
-PROJECT_ROOT=`cd $tmp; pwd`
+PROJECT_ROOT=`cd $tmp/..; pwd`
 cd ${PROJECT_ROOT}
 
 UNROLL=8
@@ -19,7 +19,7 @@ do
 	fi
 	for NR in $(seq 3 1 5)
 	do
-		python make_c_file_asm.py $M $N $K $UNROLL $NR $REPEAT
+		python python/make_c_file_asm.py $M $N $K $UNROLL $NR $REPEAT
 		make -s
 		./benchmark_kernel
 	done

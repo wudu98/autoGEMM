@@ -2,7 +2,7 @@
 set -e
 
 tmp=`dirname $0`
-PROJECT_ROOT=`cd $tmp/..; pwd`
+PROJECT_ROOT=`cd $tmp/../..; pwd`
 cd ${PROJECT_ROOT}
 
 arch=$1
@@ -34,7 +34,7 @@ do
 	echo ${M[$i]} ${N[$i]} ${K[$i]} >> MNK.txt
 done
 
-bash ./scripts/tune.sh $arch $threads $tune_num 
+bash ./scripts/utils/tune.sh $arch $threads $tune_num 
 
 if [[ -f "tune_output/tune.over" ]]; then
 	if [[ -f "scheduler_house/resnet50" ]]; then

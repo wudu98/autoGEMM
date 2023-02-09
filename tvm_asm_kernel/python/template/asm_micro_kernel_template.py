@@ -5,8 +5,6 @@ from tvm import autotvm
 from tvm.autotvm.task import ConfigEntity
 from template.gen_asm_code.tvm_extern_asm_micro_kernel import intrin_gemm_MxKxN, gemm_MxKxN_impl
 
-dtype = "float32"
-
 @autotvm.template("matmul")
 def matmul(M, K, N, parallel):
     cfg = autotvm.get_config()

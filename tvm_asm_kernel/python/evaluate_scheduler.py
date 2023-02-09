@@ -20,7 +20,7 @@ if __name__ == "__main__":
     parser.add_argument("-m", type=int, required=True, help="M")
     parser.add_argument("-k", type=int, required=True, help="K")
     parser.add_argument("-n", type=int, required=True, help="N")
-    parser.add_argument("-a", "--arch", default="mac", choices=["mac", "linux"], help='select architecture mac or linux')
+    parser.add_argument("-a", "--arch", default="mac", choices=["mac", "linux", "a64fx"], help='select architecture mac or linux')
     parser.add_argument("--parallel", action="store_true", help='whether parallel execute')
     parser.add_argument("--scheduler_log", type=str, required=True)
     args = parser.parse_args()
@@ -32,9 +32,14 @@ if __name__ == "__main__":
     best_schedule_file = args.scheduler_log
 
     if args.arch == "mac" :
-        from config.mac_config import target
+        instruction = "neon"
+        target = f"llvm -mtriple=arm64-apple-darwin -mattr=+{instruction}"
     elif args.arch == "linux" :
-        from config.linux_config import target
+        instruction = "neon"
+        target = f"llvm -mtriple=aarch64-linux-gnu -mattr=+{instruction}"
+    elif args.arch == "a64fx" :
+        instruction = "sve"
+        target = f"llvm -mtriple=aarch64-linux-gnu -mattr=+{instruction}"
         
     # print('%d, %d, %d' % (M, N, K))
-    evaluate(M, K, N, best_schedule_file, parallel, pack_dso=True,target=target)
+    evaluate(M, K, N, best_schedule_file, parallel, pack_dso=True, instruction=instruction, target=target)

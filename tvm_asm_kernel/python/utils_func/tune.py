@@ -14,6 +14,7 @@ def tune(
     parallel, 
     n_trial=2500,
     early_stopping=1000,
+    instruction="neon", 
     target="llvm",
 ):
     best_record = record_file
@@ -24,7 +25,7 @@ def tune(
         os.remove(record_file)
 
     task = autotvm.task.create(
-        "matmul", args=[M, K, N, parallel], target=target
+        "matmul", args=[M, K, N, parallel, instruction], target=target
     )
     print(task.config_space)
 

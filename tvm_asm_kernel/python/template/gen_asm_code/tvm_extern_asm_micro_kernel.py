@@ -1,12 +1,12 @@
 import os
+import re
 import tvm
 from tvm import te
 from tvm.contrib import utils, clang
 import random
 import string
-from template.gen_asm_code.gen_xsmm_asm_armv8_code import xsmm_asm_armv8_code
-from config.common_config import cc_compiler
 
+from config.common_config import cc_compiler
 
 class GemmTensorIntrin(object):
     def __init__(self, M, K, N, lda, ldb, ldc, uniq_id, ins=None, outs=None):
@@ -101,7 +101,12 @@ def intrin_gemm_MxKxN(M, K, N, lda, ldb, ldc):
     return intrin_decl, uniq_id
 
 
-def gemm_MxKxN_impl(M, K, N, lda, ldb, ldc, unroll_k, nr_main, uniq_id):
+def gemm_MxKxN_impl(M, K, N, lda, ldb, ldc, unroll_k, nr_main, instruction, uniq_id):
+    if re.search(r"neon", instruction) :
+        from template.gen_asm_code.gen_xsmm_asm_armv8_neon_code import xsmm_asm_armv8_code
+    elif re.search(r"sve", instruction) :
+        from template.gen_asm_code.gen_xsmm_asm_armv8_sve_code import xsmm_asm_armv8_code
+
     # Create c source code
     cc_code = xsmm_asm_armv8_code(M, K, N, lda, ldb, ldc, unroll_k, nr_main, uniq_id)
     

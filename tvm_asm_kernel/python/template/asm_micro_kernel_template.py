@@ -6,7 +6,7 @@ from tvm.autotvm.task import ConfigEntity
 from template.gen_asm_code.tvm_extern_asm_micro_kernel import intrin_gemm_MxKxN, gemm_MxKxN_impl
 
 @autotvm.template("matmul")
-def matmul(M, K, N, parallel):
+def matmul(M, K, N, parallel, instruction):
     cfg = autotvm.get_config()
 
     # Tiling structure: split M/N/K into 3 axes each.
@@ -93,6 +93,7 @@ def matmul(M, K, N, parallel):
                                 N,
                                 cfg["unroll_k_knob"].val,
                                 cfg["nr_main_knob"].val,
+                                instruction,
                                 uniq_id
                                 ))
 

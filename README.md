@@ -18,10 +18,14 @@ cd GEMM_TVM_ASM
 
 **Test small gemm**
 ```bash
-nohup bash ./small_gemm/benchmark.sh &
+nohup bash ./small_gemm/scripts/benchmark.sh &
+```
+or
+```bash
+bash ./small_gemm/scripts/run_single_case.sh {M} {N} {K} {UNROLL_K} {NR} {REPEATS}
 ```
 
 **Test tvm asm kernel**
 ```bash
-nohup bash ./tvm_asm_kernel/model_tune/tune_resnet50.sh {TUNE_NUM} &
+nohup bash ./tvm_asm_kernel/scripts/model_tune/tune_resnet50.sh {ARCH(mac/linux)} {THREADS} {TUNE_STEPS} &
 ```

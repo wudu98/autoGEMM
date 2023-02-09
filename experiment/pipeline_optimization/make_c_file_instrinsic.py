@@ -278,8 +278,8 @@ int main() {{
   bool ACC = false;
   test_utils::gemm_ref(A, B, refC, M, N, K, lda, ldb, ldc, ACC);
   small_gemm(A, B, ourC);
-  if (!test_utils::is_same_matrix(refC, ourC, M, N, ldc, 0.0001f)) {{
-    int idx = test_utils::diff_index(refC, ourC, M, N, ldc, 0.0001f);
+  if (!test_utils::is_same_matrix(refC, ourC, M, N, ldc, 1e-5, 1e-5)) {{
+    int idx = test_utils::diff_index(refC, ourC, M, N, ldc, 1e-5, 1e-5);
     printf("ERROR: M=%d, N=%d, K=%d, lda=%d, ldb=%d, ldc=%d, ACC=%d, ref[%d]=%.6f, our[%d]=%.6f\\n",
            M, N, K, lda, ldb, ldc, ACC, idx, refC[idx], idx, ourC[idx]);
   }} else {{
@@ -295,8 +295,8 @@ int main() {{
   ACC = true;
   test_utils::gemm_ref(A, B, refC, M, N, K, lda, ldb, ldc, ACC);
   small_gemm_with_bias(A, B, ourC);
-  if (!test_utils::is_same_matrix(refC, ourC, M, N, ldc, 0.0001f)) {{
-    int idx = test_utils::diff_index(refC, ourC, M, N, ldc, 0.0001f);
+  if (!test_utils::is_same_matrix(refC, ourC, M, N, ldc, 1e-5, 1e-5)) {{
+    int idx = test_utils::diff_index(refC, ourC, M, N, ldc, 1e-5, 1e-5);
     printf("ERROR: M=%d, N=%d, K=%d, lda=%d, ldb=%d, ldc=%d, ACC=%d, ref[%d]=%.6f, our[%d]=%.6f\\n",
            M, N, K, lda, ldb, ldc, ACC, idx, refC[idx], idx, ourC[idx]);
   }} else {{

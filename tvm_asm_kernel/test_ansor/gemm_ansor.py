@@ -9,7 +9,7 @@ parser = argparse.ArgumentParser(description="Script to run ansor.")
 parser.add_argument("-m", type=int, required=True, help="M")
 parser.add_argument("-k", type=int, required=True, help="K")
 parser.add_argument("-n", type=int, required=True, help="N")
-parser.add_argument("-a", "--arch", default="mac", choices=["mac", "linux"], help='select architecture mac or linux')
+parser.add_argument("-a", "--arch", default="mac", choices=["mac", "linux", "a64fx"], help='select architecture mac or linux')
 parser.add_argument("--use_tune", action="store_true", help='whether parallel execute')
 parser.add_argument(
     "-r",
@@ -27,9 +27,14 @@ K = args.k
 dtype = "float32"
 
 if args.arch == "mac" :
-    target = "llvm -mtriple=arm64-apple-darwin -mattr=+neon"
+    instruction = "neon"
+    target = f"llvm -mtriple=arm64-apple-darwin -mattr=+{instruction}"
 elif args.arch == "linux" :
-    target = "llvm -mtriple=aarch64-linux-gnu -mattr=+neon"
+    instruction = "neon"
+    target = f"llvm -mtriple=aarch64-linux-gnu -mattr=+{instruction}"
+elif args.arch == "a64fx" :
+    instruction = "sve"
+    target = f"llvm -mtriple=aarch64-linux-gnu -mattr=+{instruction}"
 
 @auto_scheduler.register_workload
 def gemm_ansor(M, N, K):
@@ -46,7 +51,7 @@ task = auto_scheduler.SearchTask(
 log_file = args.record_file
 
 tune_option = auto_scheduler.TuningOptions(
-    num_measure_trials=10,#000, 
+    num_measure_trials=10000, 
     runner=auto_scheduler.LocalRunner(number=100, repeat=1, timeout=300, min_repeat_ms=100),#, enable_cpu_cache_flush=True),
     measure_callbacks=[auto_scheduler.RecordToFile(log_file)],
 )

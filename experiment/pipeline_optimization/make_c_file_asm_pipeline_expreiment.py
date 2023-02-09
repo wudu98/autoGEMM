@@ -1,7 +1,6 @@
 # Generate any shape of asm micro-kernel and ensure correct
 # Compile by clang++ -O3
-# A detailed procedure for LOOP_ID == LAST_K_ID
-# modify Store C and Load C pipeline
+# older version for lastest small gemm
 
 import random
 import string

@@ -1,6 +1,21 @@
 # Generate any shape of asm micro-kernel and ensure correct
 # Compile by clang++ -O3
 
+# x0 - x5   input data
+# x6 - x17  posA and posC
+# x18       reversed
+# x19 x20   not used yet
+# x21       Point the begin memory in next block A
+# x22 x23   Rolling read next block B
+# x24       point the begin memory in next block C
+# x25       n loop count
+# x26       m loop count
+# x27       k loop count
+# x28 x29   not used yet
+# x30 x31   reversed
+
+# vector registers: Try to run out of registers to read A B and C
+
 import random
 import string
 import sys

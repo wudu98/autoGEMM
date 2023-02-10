@@ -18,7 +18,7 @@ def matmul(M, K, N, parallel, instruction):
     cfg.define_knob("unroll_k_knob", [8, 16, 32])
     cfg.define_knob("nr_main_knob", [3, 4, 5])
 
-    cfg.define_knob("padding_size", [1, 4])
+    cfg.define_knob("padding_size", [1, 4, 16])
     padding_size = cfg["padding_size"].val
 
     # Matrix "A" has a shape of (M, K).

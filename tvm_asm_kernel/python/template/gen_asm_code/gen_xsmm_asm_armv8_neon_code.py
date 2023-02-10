@@ -547,59 +547,60 @@ def NRSA(N, NR_MAIN):
 
     return NR_MAIN_LOOPS, NR_REMAIN, NR_REMAIN_LOOPS
 
-def MRSA(M, NR):
+def MRSA(M, NR, MRSA_FLAG):
     MR_MAIN = min(6, (32 - max(4, NR)) // (NR + 1))
     MR_REMAIN = M % MR_MAIN
     MR_MAIN_LOOPS = M // MR_MAIN
     MR_REMAIN_LOOPS = 1 if MR_REMAIN else 0
-    if MR_MAIN == 5 :
-      if MR_REMAIN == 1 :
-        if MR_MAIN_LOOPS >= 3 :
-          MR_MAIN_LOOPS -= 3
+    if MRSA_FLAG == 1 :
+      if MR_MAIN == 5 :
+        if MR_REMAIN == 1 :
+          if MR_MAIN_LOOPS >= 3 :
+            MR_MAIN_LOOPS -= 3
+            MR_REMAIN = 4
+            MR_REMAIN_LOOPS = 4
+          elif MR_MAIN_LOOPS >= 1 :
+            MR_MAIN_LOOPS -= 1
+            MR_REMAIN = 3
+            MR_REMAIN_LOOPS = 2
+        elif MR_REMAIN == 2 and MR_MAIN_LOOPS >= 2 :
+          MR_MAIN_LOOPS -= 2
           MR_REMAIN = 4
-          MR_REMAIN_LOOPS = 4
-        elif MR_MAIN_LOOPS >= 1 :
+          MR_REMAIN_LOOPS = 3
+        elif MR_REMAIN == 3 and MR_MAIN_LOOPS >= 1 :
           MR_MAIN_LOOPS -= 1
-          MR_REMAIN = 3
+          MR_REMAIN = 4
           MR_REMAIN_LOOPS = 2
-      elif MR_REMAIN == 2 and MR_MAIN_LOOPS >= 2 :
-        MR_MAIN_LOOPS -= 2
-        MR_REMAIN = 4
-        MR_REMAIN_LOOPS = 3
-      elif MR_REMAIN == 3 and MR_MAIN_LOOPS >= 1 :
+      elif MR_MAIN == 4 :
+        if MR_REMAIN == 1 and MR_MAIN_LOOPS >= 2 :
+          MR_MAIN_LOOPS -= 2
+          MR_REMAIN = 3
+          MR_REMAIN_LOOPS = 3
+        elif MR_REMAIN == 2 and MR_MAIN_LOOPS >= 1 :
+            MR_MAIN_LOOPS -= 1
+            MR_REMAIN = 3
+            MR_REMAIN_LOOPS = 2
+      elif MR_MAIN == 3 and MR_REMAIN == 1 and MR_MAIN_LOOPS >= 1 :
         MR_MAIN_LOOPS -= 1
-        MR_REMAIN = 4
+        MR_REMAIN = 2
         MR_REMAIN_LOOPS = 2
-    elif MR_MAIN == 4 :
-      if MR_REMAIN == 1 and MR_MAIN_LOOPS >= 2 :
-        MR_MAIN_LOOPS -= 2
-        MR_REMAIN = 3
-        MR_REMAIN_LOOPS = 3
-      elif MR_REMAIN == 2 and MR_MAIN_LOOPS >= 1 :
-          MR_MAIN_LOOPS -= 1
-          MR_REMAIN = 3
-          MR_REMAIN_LOOPS = 2
-    elif MR_MAIN == 3 and MR_REMAIN == 1 and MR_MAIN_LOOPS >= 1 :
-      MR_MAIN_LOOPS -= 1
-      MR_REMAIN = 2
-      MR_REMAIN_LOOPS = 2
     
     return MR_MAIN, MR_MAIN_LOOPS, MR_REMAIN, MR_REMAIN_LOOPS
 
-def RBSA(M, N, NR_MAIN):
+def RBSA(M, N, NR_MAIN, MRSA_FLAG):
     NR_MAIN_LOOPS, NR_REMAIN, NR_REMAIN_LOOPS = NRSA(N, NR_MAIN)
-    NR_MAIN_MR_MAIN, NR_MAIN_MR_MAIN_LOOPS, NR_MAIN_MR_REMAIN, NR_MAIN_MR_REMAIN_LOOPS = MRSA(M, NR_MAIN) if NR_MAIN_LOOPS else (0,0,0,0)
-    NR_REMAIN_MR_MAIN, NR_REMAIN_MR_MAIN_LOOPS, NR_REMAIN_MR_REMAIN, NR_REMAIN_MR_REMAIN_LOOPS = MRSA(M, NR_REMAIN) if NR_REMAIN_LOOPS else (0,0,0,0)
+    NR_MAIN_MR_MAIN, NR_MAIN_MR_MAIN_LOOPS, NR_MAIN_MR_REMAIN, NR_MAIN_MR_REMAIN_LOOPS = MRSA(M, NR_MAIN, MRSA_FLAG) if NR_MAIN_LOOPS else (0,0,0,0)
+    NR_REMAIN_MR_MAIN, NR_REMAIN_MR_MAIN_LOOPS, NR_REMAIN_MR_REMAIN, NR_REMAIN_MR_REMAIN_LOOPS = MRSA(M, NR_REMAIN, MRSA_FLAG) if NR_REMAIN_LOOPS else (0,0,0,0)
 
     return NR_MAIN_LOOPS, NR_REMAIN, NR_REMAIN_LOOPS, NR_MAIN_MR_MAIN, NR_MAIN_MR_MAIN_LOOPS, NR_MAIN_MR_REMAIN, NR_MAIN_MR_REMAIN_LOOPS, NR_REMAIN_MR_MAIN, NR_REMAIN_MR_MAIN_LOOPS, NR_REMAIN_MR_REMAIN, NR_REMAIN_MR_REMAIN_LOOPS
 
-def laf_asm_code(M, N, K, lda, ldb, ldc, UNROLL_K = 8, NR_MAIN = 4, with_bias = 0):
+def laf_asm_code(M, N, K, lda, ldb, ldc, UNROLL_K = 8, NR_MAIN = 4, MRSA_FLAG = 1, with_bias = 0):
 
     assert (UNROLL_K % (2*CONST_UNROLL_LANE) == 0)
     assert (UNROLL_K >= 4)
     assert (NR_MAIN == 3 or NR_MAIN == 4 or NR_MAIN == 5)
 
-    NR_MAIN_LOOPS, NR_REMAIN, NR_REMAIN_LOOPS, NR_MAIN_MR_MAIN, NR_MAIN_MR_MAIN_LOOPS, NR_MAIN_MR_REMAIN, NR_MAIN_MR_REMAIN_LOOPS, NR_REMAIN_MR_MAIN, NR_REMAIN_MR_MAIN_LOOPS, NR_REMAIN_MR_REMAIN, NR_REMAIN_MR_REMAIN_LOOPS = RBSA(M, N, NR_MAIN)
+    NR_MAIN_LOOPS, NR_REMAIN, NR_REMAIN_LOOPS, NR_MAIN_MR_MAIN, NR_MAIN_MR_MAIN_LOOPS, NR_MAIN_MR_REMAIN, NR_MAIN_MR_REMAIN_LOOPS, NR_REMAIN_MR_MAIN, NR_REMAIN_MR_MAIN_LOOPS, NR_REMAIN_MR_REMAIN, NR_REMAIN_MR_REMAIN_LOOPS = RBSA(M, N, NR_MAIN, MRSA_FLAG)
 
     code_str = ""
     code_str += f"""
@@ -651,7 +652,7 @@ def laf_asm_code(M, N, K, lda, ldb, ldc, UNROLL_K = 8, NR_MAIN = 4, with_bias = 
 """
     return code_str
 
-def xsmm_asm_armv8_code(M, K, N, lda, ldb, ldc, UNROLL_K, NR_MAIN, uniq_id):
+def xsmm_asm_armv8_code(M, K, N, lda, ldb, ldc, UNROLL_K, NR_MAIN, MRSA_FLAG, uniq_id):
     
     """Emit C code for gemm impl."""
     cc_code = f"""
@@ -662,12 +663,12 @@ def xsmm_asm_armv8_code(M, K, N, lda, ldb, ldc, UNROLL_K, NR_MAIN, uniq_id):
 namespace laf {{
 void small_gemm(const float *A, const float *B, float *C, int lda, int ldb, int ldc) {{
 """
-    cc_code += laf_asm_code(M, N, K, lda, ldb, ldc, UNROLL_K, NR_MAIN, with_bias = 0)
+    cc_code += laf_asm_code(M, N, K, lda, ldb, ldc, UNROLL_K, NR_MAIN, MRSA_FLAG, with_bias = 0)
     cc_code += f"""
 }}
 void small_gemm_with_bias(const float *A, const float *B, float *C, int lda, int ldb, int ldc) {{
 """
-    cc_code += laf_asm_code(M, N, K, lda, ldb, ldc, UNROLL_K, NR_MAIN, with_bias = 1)
+    cc_code += laf_asm_code(M, N, K, lda, ldb, ldc, UNROLL_K, NR_MAIN, MRSA_FLAG, with_bias = 1)
     cc_code += f"""
 }}
 }}

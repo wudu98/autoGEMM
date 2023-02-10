@@ -764,6 +764,15 @@ int main() {{
   float gflops = M * N * K * 2 / latency * n_loops / 1000000;
   printf("Version xsmm_asm, M: %d, N: %d, K: %d, perf: %.2f gflops, latency: %.6f ms\\n", M, N, K, gflops, latency / n_loops);
 
+  Timer t_1;
+  for (int i = 0; i < n_loops; ++i) {{
+    laf::small_gemm_with_bias(A, B, C, lda, ldb, ldc);
+  }}
+
+  latency = t_1.getTime();
+  gflops = M * N * K * 2 / latency * n_loops / 1000000;
+  printf("Version xsmm_asm_sve_with_bias, M: %d, N: %d, K: %d, perf: %.2f gflops, latency: %.6f ms\\n", M, N, K, gflops, latency / n_loops);
+
   bool ACC = false;
   test_utils::gemm_ref(A, B, refC, M, N, K, lda, ldb, ldc, ACC);
   laf::small_gemm(A, B, ourC, lda, ldb, ldc);

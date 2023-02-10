@@ -1,3 +1,4 @@
+import re
 import tvm
 from tvm import te
 from tvm import testing
@@ -10,15 +11,20 @@ def matmul(M, K, N, parallel, instruction):
     cfg = autotvm.get_config()
 
     # Tiling structure: split M/N/K into 3 axes each.
-    cfg.define_split("tile_x", M, num_outputs=3)
-    cfg.define_split("tile_y", N, num_outputs=3)
+    cfg.define_split("tile_x", M, num_outputs=2)
+    cfg.define_split("tile_y", N, num_outputs=2)
     cfg.define_split("tile_k", K, num_outputs=2)
 
     # Micro-kernel parameters used in tensorization.
-    cfg.define_knob("unroll_k_knob", [8, 16, 32])
     cfg.define_knob("nr_main_knob", [3, 4, 5])
+    if re.search(r"neon", instruction) :
+        cfg.define_knob("unroll_k_knob", [8, 16, 32])
+        cfg.define_knob("padding_size", [1, 4])
+    elif re.search(r"sve", instruction) :
+        cfg.define_knob("unroll_k_knob", [4, 8, 16])
+        cfg.define_knob("padding_size", [1, 4, 16])
+    cfg.define_knob("MRSA_FLAG", [0, 1])
 
-    cfg.define_knob("padding_size", [1, 4, 16])
     padding_size = cfg["padding_size"].val
 
     # Matrix "A" has a shape of (M, K).
@@ -47,16 +53,16 @@ def matmul(M, K, N, parallel, instruction):
     x, y = s[C].op.axis
     (k,) = s[C].op.reduce_axis
 
-    xt, xo, xi = cfg["tile_x"].apply(s, C, x)
-    yt, yo, yi = cfg["tile_y"].apply(s, C, y)
+    xo, xi = cfg["tile_x"].apply(s, C, x)
+    yo, yi = cfg["tile_y"].apply(s, C, y)
     ko, ki = cfg["tile_k"].apply(s, C, k)
 
     # Make (yi, xi, ki) the inner most axes, to be tensorized later.
-    s[C].reorder(yt, xt, yo, ko, xo, yi, xi, ki)
+    s[C].reorder(yo, ko, xo, yi, xi, ki)
 
     # Let autotvm to find the best order of the 6 axes:
-    cfg.define_reorder("reorder_outer", [yt, xt, yo, ko, xo], "all")
-    new_order = cfg["reorder_outer"].apply(s, C, [yt, xt, yo, ko, xo])
+    cfg.define_reorder("reorder_outer", [yo, ko, xo], "all")
+    new_order = cfg["reorder_outer"].apply(s, C, [yo, ko, xo])
 
     if parallel :
         # Fuse the outmost non-reducution axes.
@@ -93,6 +99,7 @@ def matmul(M, K, N, parallel, instruction):
                                 N,
                                 cfg["unroll_k_knob"].val,
                                 cfg["nr_main_knob"].val,
+                                cfg["MRSA_FLAG"].val,
                                 instruction,
                                 uniq_id
                                 ))

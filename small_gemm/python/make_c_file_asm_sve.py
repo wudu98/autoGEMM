@@ -43,11 +43,11 @@ RESERVED_REG_NUM = 6
 def micro_kernel_loop_asm(LOOP_ID, LAST_K_ID, LINES, COLS, real_lines, real_cols, next_lines, next_cols, vector_id_array_A, VEC_REG_A_LEN, vector_id_array_B, VEC_REG_B_LEN, register_scroll_B, LOOP_K_BEGIN_FLAG, LOOP_K_END_FLAG, REG_BLOCK_TRANS_FLAG, FMA_CALCULATE_FLAG, STORE_C_FLAG, WITH_BIAS_FLAG):
     code_str = ""
 
-    UNROLL_N = 2
+    UNROLL_NR = 2
     if COLS % 2 != 0 :
-      UNROLL_N = 1
+      UNROLL_NR = 1
     if LOOP_ID == LAST_K_ID and WITH_BIAS_FLAG :
-      UNROLL_N = COLS
+      UNROLL_NR = COLS
 
     A_odd_flag = (LOOP_ID // CONST_UNROLL_LANE) % 2
     B_odd_flag = ((LOOP_ID * COLS + VEC_REG_B_LEN) // COLS) % 2
@@ -73,55 +73,55 @@ def micro_kernel_loop_asm(LOOP_ID, LAST_K_ID, LINES, COLS, real_lines, real_cols
       code_str += f"    \"prfm    PLDL1KEEP, [x23, #64]              \\n\"\n"
       B_odd_flag = 0
 
-    for i in range(LINES*COLS//UNROLL_N):
+    for i in range(LINES*COLS//UNROLL_NR):
       line = i % LINES
       col = i // LINES
       
       # Main computing
       if FMA_CALCULATE_FLAG :
         if(LOOP_ID == 0 and LOOP_K_BEGIN_FLAG and (not WITH_BIAS_FLAG)):
-          for j in range(UNROLL_N):
-            if(line < real_lines and SIMD_LANE*UNROLL_N*col + SIMD_LANE*j < real_cols):
+          for j in range(UNROLL_NR):
+            if(line < real_lines and SIMD_LANE*UNROLL_NR*col + SIMD_LANE*j < real_cols):
               if CONST_UNROLL_LANE == 1 :
-                code_str += f"    \"fmul    z{VEC_REG_A_LEN + VEC_REG_B_LEN + line*COLS + col*UNROLL_N + j}.s, z{vector_id_array_B[vector_scroll_B[col*UNROLL_N + j]]}.s, z{vector_scroll_A[A_odd_flag][line]}.s             \\n\"\n"
+                code_str += f"    \"fmul    z{VEC_REG_A_LEN + VEC_REG_B_LEN + line*COLS + col*UNROLL_NR + j}.s, z{vector_id_array_B[vector_scroll_B[col*UNROLL_NR + j]]}.s, z{vector_scroll_A[A_odd_flag][line]}.s             \\n\"\n"
               else :
-                code_str += f"    \"fmul    z{VEC_REG_A_LEN + VEC_REG_B_LEN + line*COLS + col*UNROLL_N + j}.s, z{vector_id_array_B[vector_scroll_B[col*UNROLL_N + j]]}.s, z{vector_scroll_A[A_odd_flag][line]}.s[{mod_simd_lane_loop_id}]             \\n\"\n"
+                code_str += f"    \"fmul    z{VEC_REG_A_LEN + VEC_REG_B_LEN + line*COLS + col*UNROLL_NR + j}.s, z{vector_id_array_B[vector_scroll_B[col*UNROLL_NR + j]]}.s, z{vector_scroll_A[A_odd_flag][line]}.s[{mod_simd_lane_loop_id}]             \\n\"\n"
               
         else:
-          for j in range(UNROLL_N):
-            if(line < real_lines and SIMD_LANE*UNROLL_N*col + SIMD_LANE*j < real_cols):
+          for j in range(UNROLL_NR):
+            if(line < real_lines and SIMD_LANE*UNROLL_NR*col + SIMD_LANE*j < real_cols):
               if A_odd_flag == 1 and ((LOOP_ID == LAST_K_ID and not WITH_BIAS_FLAG) or (not LOOP_ID == LAST_K_ID and mod_simd_lane_loop_id == CONST_UNROLL_LANE - 1)) :
                 ori_line = line
                 line = (line + VEC_REG_A_LEN % real_lines) % real_lines
               if CONST_UNROLL_LANE == 1 :
-                if(SIMD_LANE*UNROLL_N*col + SIMD_LANE*(j+1) <= real_cols):
-                  code_str += f"    \"fmla    z{VEC_REG_A_LEN + VEC_REG_B_LEN + line*COLS + col*UNROLL_N + j}.s, p0/m, z{vector_id_array_B[vector_scroll_B[col*UNROLL_N + j]]}.s, z{vector_scroll_A[A_odd_flag][line]}.s             \\n\"\n"
+                if(SIMD_LANE*UNROLL_NR*col + SIMD_LANE*(j+1) <= real_cols):
+                  code_str += f"    \"fmla    z{VEC_REG_A_LEN + VEC_REG_B_LEN + line*COLS + col*UNROLL_NR + j}.s, p0/m, z{vector_id_array_B[vector_scroll_B[col*UNROLL_NR + j]]}.s, z{vector_scroll_A[A_odd_flag][line]}.s             \\n\"\n"
                 else :
-                  code_str += f"    \"fmla    z{VEC_REG_A_LEN + VEC_REG_B_LEN + line*COLS + col*UNROLL_N + j}.s, p1/m, z{vector_id_array_B[vector_scroll_B[col*UNROLL_N + j]]}.s, z{vector_scroll_A[A_odd_flag][line]}.s             \\n\"\n"
+                  code_str += f"    \"fmla    z{VEC_REG_A_LEN + VEC_REG_B_LEN + line*COLS + col*UNROLL_NR + j}.s, p1/m, z{vector_id_array_B[vector_scroll_B[col*UNROLL_NR + j]]}.s, z{vector_scroll_A[A_odd_flag][line]}.s             \\n\"\n"
               else : 
-                code_str += f"    \"fmla    z{VEC_REG_A_LEN + VEC_REG_B_LEN + line*COLS + col*UNROLL_N + j}.s, z{vector_id_array_B[vector_scroll_B[col*UNROLL_N + j]]}.s, z{vector_scroll_A[A_odd_flag][line]}.s[{mod_simd_lane_loop_id}]             \\n\"\n"
+                code_str += f"    \"fmla    z{VEC_REG_A_LEN + VEC_REG_B_LEN + line*COLS + col*UNROLL_NR + j}.s, z{vector_id_array_B[vector_scroll_B[col*UNROLL_NR + j]]}.s, z{vector_scroll_A[A_odd_flag][line]}.s[{mod_simd_lane_loop_id}]             \\n\"\n"
               if A_odd_flag == 1 and ((LOOP_ID == LAST_K_ID and not WITH_BIAS_FLAG) or (not LOOP_ID == LAST_K_ID and mod_simd_lane_loop_id == CONST_UNROLL_LANE - 1)) :
                 line = ori_line
               
                
       # Store C
       if(STORE_C_FLAG and LOOP_ID == LAST_K_ID):
-        for j in range(UNROLL_N):
-          tmp_col = UNROLL_N*col + j
+        for j in range(UNROLL_NR):
+          tmp_col = UNROLL_NR*col + j
           if line < real_lines :
             if A_odd_flag == 1 and (not WITH_BIAS_FLAG) :
               ori_line = line
               line = (line + VEC_REG_A_LEN % real_lines) % real_lines
-            if(SIMD_LANE*UNROLL_N*col + SIMD_LANE*(j+1) <= real_cols):
+            if(SIMD_LANE*UNROLL_NR*col + SIMD_LANE*(j+1) <= real_cols):
               if tmp_col == 0 :
-                code_str += f"    \"st1w     z{VEC_REG_A_LEN + VEC_REG_B_LEN + line*COLS + col*UNROLL_N + j}.s, p0, [x{RESERVED_REG_NUM+line}]           \\n\"\n"
+                code_str += f"    \"st1w     z{VEC_REG_A_LEN + VEC_REG_B_LEN + line*COLS + col*UNROLL_NR + j}.s, p0, [x{RESERVED_REG_NUM+line}]           \\n\"\n"
               else :
-                code_str += f"    \"st1w     z{VEC_REG_A_LEN + VEC_REG_B_LEN + line*COLS + col*UNROLL_N + j}.s, p0, [x{RESERVED_REG_NUM+line}, #{tmp_col}, mul vl]           \\n\"\n"
+                code_str += f"    \"st1w     z{VEC_REG_A_LEN + VEC_REG_B_LEN + line*COLS + col*UNROLL_NR + j}.s, p0, [x{RESERVED_REG_NUM+line}, #{tmp_col}, mul vl]           \\n\"\n"
             else:
               if tmp_col == 0 :
-                code_str += f"    \"st1w     z{VEC_REG_A_LEN + VEC_REG_B_LEN + line*COLS + col*UNROLL_N + j}.s, p1, [x{RESERVED_REG_NUM+line}]           \\n\"\n"
+                code_str += f"    \"st1w     z{VEC_REG_A_LEN + VEC_REG_B_LEN + line*COLS + col*UNROLL_NR + j}.s, p1, [x{RESERVED_REG_NUM+line}]           \\n\"\n"
               else :
-                code_str += f"    \"st1w     z{VEC_REG_A_LEN + VEC_REG_B_LEN + line*COLS + col*UNROLL_N + j}.s, p1, [x{RESERVED_REG_NUM+line}, #{tmp_col}, mul vl]           \\n\"\n"
+                code_str += f"    \"st1w     z{VEC_REG_A_LEN + VEC_REG_B_LEN + line*COLS + col*UNROLL_NR + j}.s, p1, [x{RESERVED_REG_NUM+line}, #{tmp_col}, mul vl]           \\n\"\n"
             if A_odd_flag == 1 and (not WITH_BIAS_FLAG) :
               line = ori_line
       
@@ -130,7 +130,7 @@ def micro_kernel_loop_asm(LOOP_ID, LAST_K_ID, LINES, COLS, real_lines, real_cols
 
       if not WITH_BIAS_FLAG:
         # Get next block C address
-        if (REG_BLOCK_TRANS_FLAG and LOOP_ID == LAST_K_ID and line == LINES - 1 and col == COLS//UNROLL_N - 1):
+        if (REG_BLOCK_TRANS_FLAG and LOOP_ID == LAST_K_ID and line == LINES - 1 and col == COLS//UNROLL_NR - 1):
           for j in range(next_lines):
             if (j == 0):
               code_str += f"    \"mov     x{RESERVED_REG_NUM}, x24    \\n\"\n"
@@ -150,13 +150,13 @@ def micro_kernel_loop_asm(LOOP_ID, LAST_K_ID, LINES, COLS, real_lines, real_cols
               code_str += f"    \"add     x{RESERVED_REG_NUM+line}, x{RESERVED_REG_NUM+line-2}, %[ldc], lsl #1    \\n\"\n"
         # Load next block C in vector register
         if REG_BLOCK_TRANS_FLAG and LOOP_ID == LAST_K_ID:
-          for j in range(UNROLL_N):
-            tmp_col = UNROLL_N*col + j
-            if(line < next_lines and SIMD_LANE*UNROLL_N*col + SIMD_LANE*j < next_cols):
+          for j in range(UNROLL_NR):
+            tmp_col = UNROLL_NR*col + j
+            if(line < next_lines and SIMD_LANE*UNROLL_NR*col + SIMD_LANE*j < next_cols):
               if tmp_col == 0 :
-                code_str += f"    \"ld1w     z{VEC_REG_A_LEN + VEC_REG_B_LEN + line*COLS + col*UNROLL_N + j}.s, p0/z, [x{RESERVED_REG_NUM+line}]           \\n\"\n"
+                code_str += f"    \"ld1w     z{VEC_REG_A_LEN + VEC_REG_B_LEN + line*COLS + col*UNROLL_NR + j}.s, p0/z, [x{RESERVED_REG_NUM+line}]           \\n\"\n"
               else :
-                code_str += f"    \"ld1w     z{VEC_REG_A_LEN + VEC_REG_B_LEN + line*COLS + col*UNROLL_N + j}.s, p0/z, [x{RESERVED_REG_NUM+line}, #{tmp_col}, mul vl]           \\n\"\n"
+                code_str += f"    \"ld1w     z{VEC_REG_A_LEN + VEC_REG_B_LEN + line*COLS + col*UNROLL_NR + j}.s, p0/z, [x{RESERVED_REG_NUM+line}, #{tmp_col}, mul vl]           \\n\"\n"
 
       # Get next block A address
       if (REG_BLOCK_TRANS_FLAG and LOOP_ID == LAST_K_ID and line == 0 and col == 0):
@@ -186,7 +186,7 @@ def micro_kernel_loop_asm(LOOP_ID, LAST_K_ID, LINES, COLS, real_lines, real_cols
               code_str += f"    \"add      x{RESERVED_REG_NUM+LINES+line}, x{RESERVED_REG_NUM+LINES+line}, #{CONST_UNROLL_LANE * DATA_BYTE}     \\n\"\n"
           line = ori_line
 
-        if((LAST_K_ID == -1 or LOOP_ID < (LAST_K_ID - LAST_K_ID%4)) and mod_simd_lane_loop_id == CONST_UNROLL_LANE - 1 and line < real_lines and col == (real_cols+SIMD_LANE-1)//SIMD_LANE//UNROLL_N - 1):
+        if((LAST_K_ID == -1 or LOOP_ID < (LAST_K_ID - LAST_K_ID%4)) and mod_simd_lane_loop_id == CONST_UNROLL_LANE - 1 and line < real_lines and col == (real_cols+SIMD_LANE-1)//SIMD_LANE//UNROLL_NR - 1):
           if (2 * real_lines > VEC_REG_A_LEN and line < real_lines - VEC_REG_A_LEN % real_lines):
             if A_odd_flag == 0:
               ori_line = line
@@ -201,7 +201,7 @@ def micro_kernel_loop_asm(LOOP_ID, LAST_K_ID, LINES, COLS, real_lines, real_cols
       else :
         if not WITH_BIAS_FLAG:
           # Load next block A
-          if(LOOP_ID == LAST_K_ID and line < next_lines and col == (real_cols+SIMD_LANE-1)//SIMD_LANE//UNROLL_N - 1) :
+          if(LOOP_ID == LAST_K_ID and line < next_lines and col == (real_cols+SIMD_LANE-1)//SIMD_LANE//UNROLL_NR - 1) :
             if CONST_UNROLL_LANE == 1 :
               code_str += f"    \"ld1rw     z{vector_scroll_A[0][line]}.s, p0/z, [x{RESERVED_REG_NUM+LINES+line}]    \\n\"\n"
             else :
@@ -209,7 +209,7 @@ def micro_kernel_loop_asm(LOOP_ID, LAST_K_ID, LINES, COLS, real_lines, real_cols
             code_str += f"    \"add      x{RESERVED_REG_NUM+LINES+line}, x{RESERVED_REG_NUM+LINES+line}, #{CONST_UNROLL_LANE * DATA_BYTE}     \\n\"\n"
         else:
           # Load next block A
-          if(LOOP_ID == LAST_K_ID and line < next_lines and col == (real_cols+SIMD_LANE-1)//SIMD_LANE//UNROLL_N - 1) :
+          if(LOOP_ID == LAST_K_ID and line < next_lines and col == (real_cols+SIMD_LANE-1)//SIMD_LANE//UNROLL_NR - 1) :
             if A_odd_flag == 0 or line >= real_lines - VEC_REG_A_LEN % real_lines:
               if CONST_UNROLL_LANE == 1 :
                 code_str += f"    \"ld1rw     z{vector_scroll_A[0][line]}.s, p0/z, [x{RESERVED_REG_NUM+LINES+line}]    \\n\"\n"
@@ -219,14 +219,14 @@ def micro_kernel_loop_asm(LOOP_ID, LAST_K_ID, LINES, COLS, real_lines, real_cols
 
       # Sequence Load next B in vector register
       if (line == LINES - 1):
-        for j in range(UNROLL_N):
-          if(((not LOOP_ID == LAST_K_ID) or (LOOP_ID == LAST_K_ID and COLS == VEC_REG_B_LEN)) and SIMD_LANE*UNROLL_N*col + SIMD_LANE*j < real_cols):
-            if (LOOP_ID == LAST_K_ID - 1 and UNROLL_N*col + j >= 2 * COLS - VEC_REG_B_LEN):
+        for j in range(UNROLL_NR):
+          if(((not LOOP_ID == LAST_K_ID) or (LOOP_ID == LAST_K_ID and COLS == VEC_REG_B_LEN)) and SIMD_LANE*UNROLL_NR*col + SIMD_LANE*j < real_cols):
+            if (LOOP_ID == LAST_K_ID - 1 and UNROLL_NR*col + j >= 2 * COLS - VEC_REG_B_LEN):
               continue
             if ptr_B_POS == 0 :
-              code_str += f"    \"ld1w     z{vector_id_array_B[vector_scroll_B[col*UNROLL_N + j]]}.s, p0/z, [x{register_scroll_B[B_odd_flag]}]             \\n\"\n"
+              code_str += f"    \"ld1w     z{vector_id_array_B[vector_scroll_B[col*UNROLL_NR + j]]}.s, p0/z, [x{register_scroll_B[B_odd_flag]}]             \\n\"\n"
             else :
-              code_str += f"    \"ld1w     z{vector_id_array_B[vector_scroll_B[col*UNROLL_N + j]]}.s, p0/z, [x{register_scroll_B[B_odd_flag]}, #{ptr_B_POS}, mul vl]             \\n\"\n"
+              code_str += f"    \"ld1w     z{vector_id_array_B[vector_scroll_B[col*UNROLL_NR + j]]}.s, p0/z, [x{register_scroll_B[B_odd_flag]}, #{ptr_B_POS}, mul vl]             \\n\"\n"
             # Get next B address
             if ptr_B_POS == COLS - 1:
               ptr_B_POS = 0

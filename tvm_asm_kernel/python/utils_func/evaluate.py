@@ -2,7 +2,6 @@ import os
 import json
 import tvm
 from tvm import te
-from tvm import testing
 from tvm import autotvm
 from tvm.autotvm.task import ConfigEntity
 
@@ -57,7 +56,7 @@ def evaluate(M, K, N, record_file, parallel, pack_dso, instruction="neon", targe
 
     expected = np.dot(a.asnumpy(), b.asnumpy())
 
-    tvm.testing.assert_allclose(c.asnumpy(), expected, rtol=1e-2, atol=1e-4)
+    np.testing.assert_allclose(c.asnumpy(), expected, rtol=1e-2, atol=1e-4)
     evaluator = func.time_evaluator(func.entry_name, ctx, number=1000, min_repeat_ms=5000)
     mean_time = evaluator(a, packed_b, c).mean
     gflops = 2 * M * N * K * 1e-9 / mean_time

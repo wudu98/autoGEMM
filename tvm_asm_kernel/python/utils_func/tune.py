@@ -1,6 +1,5 @@
 import tvm
 from tvm import te
-from tvm import testing
 from tvm import autotvm
 
 import os

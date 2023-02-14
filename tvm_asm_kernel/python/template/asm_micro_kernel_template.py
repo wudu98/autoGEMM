@@ -10,19 +10,19 @@ def matmul(M, K, N, parallel, instruction):
     cfg = autotvm.get_config()
 
     # Tiling structure: split M/N/K into 3 axes each.
-    cfg.define_split("tile_x", M, num_outputs=2)
-    cfg.define_split("tile_y", N, num_outputs=2)
-    cfg.define_split("tile_k", K, num_outputs=2)
+    cfg.define_split("tile_x", M, num_outputs=3)
+    cfg.define_split("tile_y", N, num_outputs=3)
+    cfg.define_split("tile_k", K, num_outputs=3)
 
     # Micro-kernel parameters used in tensorization.
     cfg.define_knob("nr_main_knob", [3, 4, 5])
+    cfg.define_knob("MRSA_FLAG", [0, 1])
     if re.search(r"neon", instruction) :
         cfg.define_knob("unroll_k_knob", [8, 16, 32])
         cfg.define_knob("padding_size", [1, 4])
     elif re.search(r"sve", instruction) :
         cfg.define_knob("unroll_k_knob", [4, 8, 16])
         cfg.define_knob("padding_size", [1, 4, 16])
-    cfg.define_knob("MRSA_FLAG", [0, 1])
 
     padding_size = cfg["padding_size"].val
 
@@ -52,22 +52,22 @@ def matmul(M, K, N, parallel, instruction):
     x, y = s[C].op.axis
     (k,) = s[C].op.reduce_axis
 
-    xo, xi = cfg["tile_x"].apply(s, C, x)
-    yo, yi = cfg["tile_y"].apply(s, C, y)
-    ko, ki = cfg["tile_k"].apply(s, C, k)
+    xt, xo, xi = cfg["tile_x"].apply(s, C, x)
+    yt, yo, yi = cfg["tile_y"].apply(s, C, y)
+    kt, ko, ki = cfg["tile_k"].apply(s, C, k)
 
     # Make (yi, xi, ki) the inner most axes, to be tensorized later.
-    s[C].reorder(yo, ko, xo, yi, xi, ki)
+    s[C].reorder(yt, kt, xt, yo, ko, xo, yi, xi, ki)
 
     # Let autotvm to find the best order of the 6 axes:
-    cfg.define_reorder("reorder_outer", [yo, ko, xo], "all")
-    new_order = cfg["reorder_outer"].apply(s, C, [yo, ko, xo])
+    cfg.define_reorder("reorder_outer", [yt, kt, xt, yo, ko, xo], "all")
+    new_order = cfg["reorder_outer"].apply(s, C, [yt, kt, xt, yo, ko, xo])
 
     if parallel :
         # Fuse the outmost non-reducution axes.
         sibling_axes = []
         for axis in new_order:
-            if axis not in [ko]:
+            if axis not in [kt, ko]:
                 sibling_axes.append(axis)
             else:
                 break

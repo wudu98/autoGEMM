@@ -43,7 +43,7 @@ namespace KernelParams
                 load_dict = json.loads(line)
                 MKN = load_dict["input"]
                 cfg = load_dict["config"]["entity"]
-                cc_code+=f"""        params_list.push_back(SimpleStruct({MKN[2][0]}, {MKN[2][2]}, {MKN[2][1]}, {cfg[1][-1][-1]}, {cfg[2][-1][-1]}, {cfg[5][-1]}));\n"""
+                cc_code+=f"""        params_list.push_back(SimpleStruct({MKN[2][0]}, {MKN[2][2]}, {MKN[2][1]}, {cfg[1][-1][-1]}, {cfg[2][-1][-1]}, {cfg[6][-1]}));\n"""
         cc_code += f"""    }}
 }};
 #endif"""

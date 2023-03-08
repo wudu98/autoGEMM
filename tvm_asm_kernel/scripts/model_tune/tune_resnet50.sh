@@ -29,7 +29,7 @@ if [[ -f $MNK_file ]]; then
     rm -rf $MNK_file
 fi
 
-for (( i=0; i<21; i++))
+for (( i=0; i<20; i++))
 do
 	echo ${M[$i]} ${N[$i]} ${K[$i]} >> MNK.txt
 done

@@ -37,9 +37,9 @@ do
 		make -s
 		./benchmark_kernel
 
-		python make_c_file_instrinsic_2.py $M $N $K $REPEAT
-		make -s
-		./benchmark_kernel
+		# python make_c_file_instrinsic_2.py $M $N $K $REPEAT
+		# make -s
+		# ./benchmark_kernel
 
 		python make_c_file_instrinsic_3.py $M $N $K $REPEAT
 		make -s

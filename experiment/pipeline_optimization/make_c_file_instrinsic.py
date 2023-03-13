@@ -2,6 +2,7 @@
 # compile by g++
 # Support for arbitrary shape matrices
 # optimization not shown
+# This is an instance of ARM NEON intrinsic, which could output correct results on a small matrix of arbitrary shape
 
 import random
 import string

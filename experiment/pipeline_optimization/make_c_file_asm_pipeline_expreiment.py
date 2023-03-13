@@ -1,6 +1,7 @@
 # Generate any shape of asm micro-kernel and ensure correct
 # Compile by clang++ -O3
-# older version for lastest small gemm
+# older version for autoGEMM small gemm
+# used for pipeline experiment
 
 import random
 import string
@@ -14,10 +15,10 @@ NR_MAIN = int(sys.argv[5])
 repeat = int(sys.argv[6])
 
 Pipeline_strategy_level = int(sys.argv[7])
-# 0 - optimization d)
-# 1 - optimization not shown
-# 2 - optimization not shown
-# 3 - optimization e)
+# 0 - corresponding to figure c) , base implement of ARM ASM cod, corresponding listing 3
+# 1 - optimization not shown, use extra register pre load A 
+# 2 - optimization not shown, fuse last K with store
+# 3 - corresponding to figure d) , add micro-kernel level pipeline, here all autoGEMM optimize method used
 
 SIMD_LANE = 4
 assert (SIMD_LANE == 4)

@@ -14,9 +14,9 @@ NR_MAIN = int(sys.argv[5])
 repeat = int(sys.argv[6])
 
 Pipeline_strategy_level = int(sys.argv[7])
-# 0 - optimization b)
-# 1 - optimization c)
-# 2 - optimization d)
+# 0 - optimization d)
+# 1 - optimization not shown
+# 2 - optimization not shown
 # 3 - optimization e)
 
 SIMD_LANE = 4

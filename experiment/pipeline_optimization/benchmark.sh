@@ -8,9 +8,9 @@ cd ${PROJECT_ROOT}
 UNROLL=8
 TOT_REPEAT=65536000000
 
-M_list=( 5 80 80)
-N_list=(64 16 64)
-K_list=(4 16 64 256)
+M_list=( 5  5 80 80)
+N_list=(16 64 16 64)
+K_list=( 4 16 64 256)
 
 for K in ${K_list[*]}
 do
@@ -29,7 +29,19 @@ do
 		
 		echo -n $M, $N, $K," " 
 
-		python make_c_file_instrinsic.py $M $N $K $UNROLL $NR $REPEAT
+		# python make_c_file_instrinsic.py $M $N $K $REPEAT
+		# make -s
+		# ./benchmark_kernel
+
+		python make_c_file_instrinsic_1.py $M $N $K $REPEAT
+		make -s
+		./benchmark_kernel
+
+		python make_c_file_instrinsic_2.py $M $N $K $REPEAT
+		make -s
+		./benchmark_kernel
+
+		python make_c_file_instrinsic_3.py $M $N $K $REPEAT
 		make -s
 		./benchmark_kernel
 
@@ -37,13 +49,13 @@ do
 		make -s
 		./benchmark_kernel
 
-		python make_c_file_asm_pipeline_expreiment.py $M $N $K $UNROLL $NR $REPEAT 1
-		make -s
-		./benchmark_kernel
+		# python make_c_file_asm_pipeline_expreiment.py $M $N $K $UNROLL $NR $REPEAT 1
+		# make -s
+		# ./benchmark_kernel
 
-		python make_c_file_asm_pipeline_expreiment.py $M $N $K $UNROLL $NR $REPEAT 2
-		make -s
-		./benchmark_kernel
+		# python make_c_file_asm_pipeline_expreiment.py $M $N $K $UNROLL $NR $REPEAT 2
+		# make -s
+		# ./benchmark_kernel
 
 		python make_c_file_asm_pipeline_expreiment.py $M $N $K $UNROLL $NR $REPEAT 3
 		make -s

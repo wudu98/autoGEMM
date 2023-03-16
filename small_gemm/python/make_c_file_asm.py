@@ -771,7 +771,7 @@ int main() {{
 
   latency = t_1.getTime();
   gflops = M * N * K * 2 / latency * n_loops / 1000000;
-  printf("Version xsmm_asm_sve_with_bias, M: %d, N: %d, K: %d, perf: %.2f gflops, latency: %.6f ms\\n", M, N, K, gflops, latency / n_loops);
+  printf("Version xsmm_asm_with_bias, M: %d, N: %d, K: %d, perf: %.2f gflops, latency: %.6f ms\\n", M, N, K, gflops, latency / n_loops);
 
   bool ACC = false;
   test_utils::gemm_ref(A, B, refC, M, N, K, lda, ldb, ldc, ACC);

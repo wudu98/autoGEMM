@@ -41,17 +41,17 @@ do
 		# make -s
 		# ./benchmark_kernel
 
-		python make_c_file_instrinsic_3.py $M $N $K $REPEAT
-		make -s
-		./benchmark_kernel
+		# python make_c_file_instrinsic_3.py $M $N $K $REPEAT
+		# make -s
+		# ./benchmark_kernel
 
 		python make_c_file_asm_pipeline_expreiment.py $M $N $K $UNROLL $NR $REPEAT 0
 		make -s
 		./benchmark_kernel
 
-		# python make_c_file_asm_pipeline_expreiment.py $M $N $K $UNROLL $NR $REPEAT 1
-		# make -s
-		# ./benchmark_kernel
+		python make_c_file_asm_pipeline_expreiment.py $M $N $K $UNROLL $NR $REPEAT 1
+		make -s
+		./benchmark_kernel
 
 		# python make_c_file_asm_pipeline_expreiment.py $M $N $K $UNROLL $NR $REPEAT 2
 		# make -s

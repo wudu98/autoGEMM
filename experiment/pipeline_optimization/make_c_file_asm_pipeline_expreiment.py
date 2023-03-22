@@ -15,9 +15,9 @@ NR_MAIN = int(sys.argv[5])
 repeat = int(sys.argv[6])
 
 Pipeline_strategy_level = int(sys.argv[7])
-# 0 - corresponding to figure c) , base implement of ARM ASM cod, corresponding listing 3
+# 0 - corresponding to figure b) , base implement of ARM ASM code, corresponding listing 2
 # 1 - optimization not shown, use extra register pre load A 
-# 2 - optimization not shown, fuse last K with store
+# 2 - corresponding to figure c) , fuse last K with store, corresponding listing 3
 # 3 - corresponding to figure d) , add micro-kernel level pipeline, here all autoGEMM optimize method used
 
 SIMD_LANE = 4

@@ -1,6 +1,7 @@
 # gemm intrinsic implementations
 # compile by g++
 # corresponding to optimization listing 3
+# optimization not shown
 
 import random
 import string

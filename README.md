@@ -6,7 +6,7 @@
 * git 
 * python3
 * LLVM
-* TVM (v0.8 Release)
+* TVM (v0.10 Release)
 
 TVM is used to generate scheduler with good performance. Please follow the tutorial https://tvm.apache.org/docs/install/from_source.html to install TVM .   
 
@@ -14,6 +14,12 @@ TVM is used to generate scheduler with good performance. Please follow the tutor
 ```bash
 git clone https://github.com/wudu98/GEMM_TVM_ASM.git
 cd GEMM_TVM_ASM
+```
+
+**Test experiment**
+```bash
+bash ./experiment/pipeline_optimization/benchmark.sh
+bash ./experiment/RBSA_optimization/benchmark.sh
 ```
 
 **Test small gemm**

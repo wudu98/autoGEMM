@@ -1,4 +1,4 @@
-# GEMM_TVM_ASM
+# autoGEMM
 
 ---
 ## How to build
@@ -8,12 +8,12 @@
 * LLVM
 * TVM (v0.10 Release)
 
-TVM is used to generate scheduler with good performance. Please follow the tutorial https://tvm.apache.org/docs/install/from_source.html to install TVM .   
+TVM is used to generate scheduler with near-to-peak performance. Please follow the tutorial https://tvm.apache.org/docs/install/from_source.html to install TVM.
 
-**Git clone GEMM_TVM_ASM repo**
+**Git clone autoGEMM repo**
 ```bash
-git clone https://github.com/wudu98/GEMM_TVM_ASM.git
-cd GEMM_TVM_ASM
+git clone https://github.com/wudu98/autoGEMM.git
+cd autoGEMM
 ```
 
 **Test experiment**
@@ -22,7 +22,7 @@ bash ./experiment/pipeline_optimization/benchmark.sh
 bash ./experiment/RBSA_optimization/benchmark.sh
 ```
 
-**Test small gemm**
+**Test small GEMM**
 ```bash
 nohup bash ./small_gemm/scripts/benchmark.sh &
 ```
@@ -31,7 +31,7 @@ or
 bash ./small_gemm/scripts/run_single_case.sh {M} {N} {K} {UNROLL_K} {NR} {REPEATS}
 ```
 
-**Test tvm asm kernel**
+**Test whole framework**
 ```bash
 nohup bash ./tvm_asm_kernel/scripts/model_tune/tune_resnet50.sh {ARCH(mac/linux/a64fx)} {THREADS} {TUNE_STEPS} &
 bash ./tvm_asm_kernel/scripts/utils/evaluate.sh {ARCH(mac/linux/a64fx)} {THREADS} {REPEATS} 

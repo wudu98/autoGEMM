@@ -1,5 +1,7 @@
 # autoGEMM
 
+An open-source library that pushes the limits of performance portability for irregular General Matrix Multiplication (GEMM) computations on the widely-used Arm architectures. autoGEMM generates optimized kernels for various hardware configurations by auto-combining fragments of auto-generated micro-kernels that employ hand-written optimizations to maximize computational efficiency. We optimize the kernel pipeline by tuning the register reuse and the data load/store overlapping. In addition, we use a dynamic tiling scheme to generate balanced tile shapes, based on the shapes of the matrices. We build autoGEMM on top of the TVM framework where our dynamic tiling scheme prunes the search space for TVM to identify the optimal combination of parameters for code optimization.
+
 ---
 ## How to build
 **Install required build dependencies:**
